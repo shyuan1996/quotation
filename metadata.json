@@ -1,0 +1,5 @@
+{
+  "name": "Cloud Quotation Generator",
+  "description": "A professional quotation generator with Firebase cloud storage integration, print-ready layout, and real-time editing.",
+  "requestFramePermissions": []
+}
