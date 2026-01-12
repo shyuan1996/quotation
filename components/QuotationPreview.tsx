@@ -93,7 +93,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
 
     if (isEditing) {
         return (
-            <div className="flex items-start justify-end w-full h-full">
+            <div className="flex items-baseline justify-end w-full h-full">
                  <input 
                     ref={inputRef}
                     type="number"
@@ -113,7 +113,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
     return (
         <div 
             onClick={() => setIsEditing(true)}
-            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-1 font-medium text-black h-full flex items-start justify-end leading-snug text-[17px]"
+            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-1 font-medium text-black h-full flex items-baseline justify-end leading-snug text-[17px]"
         >
             {formatCurrency(showValue)}
         </div>
@@ -449,10 +449,10 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     <tr className="text-white print:text-white print:bg-black" style={{ backgroundColor: data.themeColor }}>
                                         <th className="p-2 w-[5%] text-center rounded-tl-sm text-[19px]">#</th>
                                         <th className="p-2 w-[40%] text-left text-[19px]">品名</th>
-                                        <th className="p-2 w-[20%] text-left text-[19px]">規格</th>
+                                        <th className="p-2 w-[20%] text-left text-[19px]">規格(cm)</th>
                                         <th className="p-2 w-[8%] text-center text-[19px]">數量</th>
-                                        <th className="p-2 w-[12%] text-center text-[19px]">單價</th>
-                                        <th className="p-2 w-[12%] text-center rounded-tr-sm text-[19px]">金額</th>
+                                        <th className="p-2 w-[12%] text-right text-[19px]">單價</th>
+                                        <th className="p-2 w-[12%] text-right rounded-tr-sm text-[19px]">金額</th>
                                         <th className="p-2 w-[3%] print:hidden"></th>
                                     </tr>
                                 </thead>
@@ -481,7 +481,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         >
                                             {/* Text-only cells get py-2 to match input padding+height */}
                                             <td 
-                                                className="px-1 py-2 text-center text-gray-500 align-top cursor-move select-none hover:text-gray-800 active:text-blue-500"
+                                                className="px-2 py-[1px] text-center text-gray-500 align-baseline cursor-move select-none hover:text-gray-800 active:text-blue-500"
                                                 onMouseEnter={() => setDragActiveIndex(arrayIndex)}
                                                 onMouseLeave={() => setDragActiveIndex(null)}
                                                 onMouseDown={() => setDragActiveIndex(arrayIndex)} // Ensure touch/click works
@@ -490,8 +490,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 {globalIndex}
                                             </td>
                                             {/* Input cells get p-1, inner input has py-1 */}
-                                            <td className="p-1 align-top">
-                                                <div className="flex items-center gap-2">
+                                            <td className="px-1 py-[1px] align-baseline">
+                                                <div className="flex items-baseline gap-2">
                                                     <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
                                                     
                                                     {(item.description === null) && (
@@ -500,9 +500,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 </div>
                                                 
                                                 {(item.description !== null) && (
-                                                    <div className="relative mt-1">
+                                                    <div className="relative mt-0">
                                                         <AutoHeightTextarea 
-                                                            className={`text-[15px] text-gray-500 ${inputStyle}`} 
+                                                            className={`text-[15px] text-gray-500 ${inputStyle} py-0`} 
                                                             value={item.description || ''} 
                                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)} 
                                                             placeholder="詳細描述..."
@@ -512,18 +512,20 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="p-1 align-top">
-                                                <AutoHeightTextarea 
-                                                    rows={1}
-                                                    className={`text-[17px] ${inputStyle}`} 
-                                                    value={item.spec} 
-                                                    onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
-                                                />
+                                            <td className="px-1 py-[1px] align-baseline">
+                                                <div className="flex items-baseline">
+                                                    <AutoHeightTextarea 
+                                                        rows={1}
+                                                        className={`text-[16px] ${inputStyle}`} 
+                                                        value={item.spec} 
+                                                        onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
+                                                    />
+                                                </div>
                                             </td>
-                                            <td className="p-1 text-center align-top">
+                                            <td className="px-1 py-[1px] text-center align-baseline">
                                                 <input type="number" className={`text-center ${inputStyle} text-[17px]`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
                                             </td>
-                                            <td className="p-1 align-top">
+                                            <td className="px-1 py-[1px] align-baseline">
                                                 <EditablePriceCell 
                                                     value={item.price} 
                                                     displayValue={effectiveUnitPrice}
@@ -531,10 +533,10 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 />
                                             </td>
                                             {/* Text-only cells get py-2 to match input padding+height */}
-                                            <td className="px-1 py-2 text-right font-medium align-top leading-snug text-black">
+                                            <td className="px-2 py-[1px] text-right font-medium align-baseline leading-snug text-black">
                                                 {formatCurrency(rowAmount)}
                                             </td>
-                                            <td className="px-1 py-2 text-center align-top print:hidden">
+                                            <td className="px-2 py-[1px] text-center align-top print:hidden">
                                                 <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14} /></button>
                                             </td>
                                         </tr>
@@ -672,4 +674,4 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
         })}
     </div>
   );
-};
+}
