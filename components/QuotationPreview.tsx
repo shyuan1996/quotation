@@ -77,7 +77,8 @@ const AutoHeightTextarea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElem
 };
 
 // Component: Editable Price Cell
-const EditablePriceCell: React.FC<{ value: number; onChange: (val: number) => void }> = ({ value, onChange }) => {
+// Added displayValue prop to show calculated (pre-tax) price when not editing
+const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChange: (val: number) => void }> = ({ value, displayValue, onChange }) => {
     const [isEditing, setIsEditing] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,13 +89,15 @@ const EditablePriceCell: React.FC<{ value: number; onChange: (val: number) => vo
         }
     }, [isEditing]);
 
+    const showValue = displayValue !== undefined ? displayValue : value;
+
     if (isEditing) {
         return (
-            <div className="flex items-start justify-end w-full h-full pt-[2px]">
+            <div className="flex items-start justify-end w-full h-full">
                  <input 
                     ref={inputRef}
                     type="number"
-                    className="text-right w-24 bg-white outline-none border-b border-blue-500 m-0 p-0 text-black font-medium leading-tight" 
+                    className="text-right w-24 bg-white outline-none border-b border-blue-500 m-0 px-1 py-1 text-black font-medium leading-snug text-[17px]" 
                     value={value === 0 ? '' : value} 
                     onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
                     onBlur={() => setIsEditing(false)}
@@ -110,9 +113,9 @@ const EditablePriceCell: React.FC<{ value: number; onChange: (val: number) => vo
     return (
         <div 
             onClick={() => setIsEditing(true)}
-            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 font-medium text-black h-full flex items-start justify-end pt-[2px] leading-tight"
+            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-1 font-medium text-black h-full flex items-start justify-end leading-snug text-[17px]"
         >
-            {formatCurrency(value)}
+            {formatCurrency(showValue)}
         </div>
     );
 };
@@ -121,25 +124,52 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
   
   const [showDiscount, setShowDiscount] = useState(data.discount > 0);
   
+  // Drag and Drop Refs and State
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+  const [dragActiveIndex, setDragActiveIndex] = useState<number | null>(null);
+
   useEffect(() => {
     if (data.discount > 0) setShowDiscount(true);
   }, [data.discount]);
 
+  // --- Sort Handler ---
+  const handleSort = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    
+    // No change if dropped on itself
+    if (dragItem.current === dragOverItem.current) {
+        dragItem.current = null;
+        dragOverItem.current = null;
+        return;
+    }
+
+    const _items = [...data.items];
+    const draggedItemContent = _items[dragItem.current];
+
+    // Remove the item from its original position
+    _items.splice(dragItem.current, 1);
+    // Insert it at the new position
+    _items.splice(dragOverItem.current, 0, draggedItemContent);
+
+    setData({ ...data, items: _items });
+    
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
   // --- Dynamic Pagination Logic ---
   const pages = useMemo(() => {
       // Constants for A4 layout (Approximate pixels based on 96DPI and Tailwind styles)
-      // A4 Height = 1123px. We use ~1050px as safe printable height minus margins.
       const A4_CONTENT_HEIGHT = 1050; 
       
-      // Estimated Heights of Fixed Blocks
-      const HEADER_HEIGHT = 380; // Logo, Company Info, Header Grid, Client Info
-      const FOOTER_HEIGHT = 320; // Totals, Remarks, Seal, Signature
-      const PAGE_2_HEADER_HEIGHT = 60; // Spacer + Table Header
-      const ROW_BASE_HEIGHT = 45; // Min height for a single row
-      const ROW_LINE_HEIGHT = 24; // Height added per new line
-      const BOTTOM_SPACER = 50; // Space for "(Continued...)"
+      const HEADER_HEIGHT = 380; 
+      const FOOTER_HEIGHT = 320; 
+      const PAGE_2_HEADER_HEIGHT = 60; 
+      const ROW_BASE_HEIGHT = 45; 
+      const ROW_LINE_HEIGHT = 24; 
+      const BOTTOM_SPACER = 50; 
 
-      // Helper to estimate item height based on text content (newlines + length)
       const getItemHeight = (item: QuoteItem) => {
           const countLines = (text: string | null, approxCharsPerLine: number) => {
               if (!text) return 1;
@@ -151,79 +181,47 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
               return totalLines;
           };
 
-          const nameLines = countLines(item.name, 22); // Approx 22 chars width for Name col
-          const descLines = countLines(item.description, 35); // Approx 35 chars for Desc
-          const specLines = countLines(item.spec, 15); // Approx 15 chars for Spec col
+          const nameLines = countLines(item.name, 22); 
+          const descLines = countLines(item.description, 35); 
+          const specLines = countLines(item.spec, 15); 
           
-          // The row height is determined by the tallest column
-          // Note: Description creates a new block below name, so it adds up differently
-          // Layout: Name (row 1) + Description (row 2...)
-          
-          // Height from Name column block (Name + Description)
           const nameBlockLines = nameLines + (item.description ? descLines : 0);
-          
           const maxLines = Math.max(nameBlockLines, specLines, 1);
           return ROW_BASE_HEIGHT + ((maxLines - 1) * ROW_LINE_HEIGHT);
       };
 
       const resultPages: QuoteItem[][] = [];
       let currentPageItems: QuoteItem[] = [];
-      let currentHeight = HEADER_HEIGHT; // Start page 1 with Header used
+      let currentHeight = HEADER_HEIGHT; 
       let pageIndex = 0;
 
       data.items.forEach((item, index) => {
           const itemHeight = getItemHeight(item);
+          let limit = A4_CONTENT_HEIGHT - BOTTOM_SPACER; 
           
-          // Check if adding this item exceeds the limit
-          // If it's potentially the last page, we need to reserve space for Footer.
-          // If it's NOT the last page, we just need space for "(Continued...)"
-          
-          // Strategy: Try to fit assuming this IS the last page.
-          // If (Current + Item + Footer) > A4, then this CANNOT be the last page.
-          // So we check: Does (Current + Item + Spacer) > A4? If yes, break page.
-          
-          // But we don't know if more items are coming. 
-          // Simplified Greedy Algorithm:
-          // 1. Calculate space remaining.
-          // 2. Ideally, we want to keep Footer together with items on the last page.
-          
-          let limit = A4_CONTENT_HEIGHT - BOTTOM_SPACER; // Default limit (leave room for continued text)
-          
-          // If we are on a page, and this is the very last item, we *hope* to fit the footer.
           const isLastItemGlobal = index === data.items.length - 1;
           
           if (isLastItemGlobal) {
-             // For the last item, we strictly check if it fits WITH footer
              if (currentHeight + itemHeight + FOOTER_HEIGHT > A4_CONTENT_HEIGHT) {
-                 // Won't fit with footer.
-                 // Push current page (without this item potentially, or with it if it fits alone)
-                 
-                 // Can we fit just the item without footer?
                  if (currentHeight + itemHeight < limit) {
-                     // Fit item here, push footer to next page (requires a new page just for footer)
                      currentPageItems.push(item);
                      resultPages.push(currentPageItems);
-                     // Create new empty page for footer
                      currentPageItems = []; 
                      currentHeight = PAGE_2_HEADER_HEIGHT;
                  } else {
-                     // Item itself doesn't fit
                      resultPages.push(currentPageItems);
                      currentPageItems = [item];
                      currentHeight = PAGE_2_HEADER_HEIGHT + itemHeight;
                  }
              } else {
-                 // Fits comfortably with footer!
                  currentPageItems.push(item);
                  currentHeight += itemHeight;
              }
           } else {
-              // Not the last item. Just check if item fits in page body
               if (currentHeight + itemHeight > limit) {
-                  // Break Page
                   resultPages.push(currentPageItems);
                   currentPageItems = [item];
-                  currentHeight = PAGE_2_HEADER_HEIGHT + itemHeight; // Next page starts with smaller header
+                  currentHeight = PAGE_2_HEADER_HEIGHT + itemHeight; 
                   pageIndex++;
               } else {
                   currentPageItems.push(item);
@@ -235,7 +233,6 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
       if (currentPageItems.length > 0) {
           resultPages.push(currentPageItems);
       } else if (resultPages.length === 0) {
-          // Handle empty state
           resultPages.push([]);
       }
 
@@ -245,14 +242,21 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
   // --- Calculations ---
   const taxFactor = 1 + (data.quoteDetails.taxRate / 100);
-  let calculatedSubtotal = 0;
   
-  data.items.forEach(item => {
+  // Logic: 
+  // If Tax Inclusive: Unit Price (Input) -> Convert to Pre-Tax Unit Price -> Multiply by Qty -> Row Amount
+  // If Tax Exclusive: Unit Price (Input) -> Multiply by Qty -> Row Amount
+  const getPreTaxUnitPrice = (price: number) => {
       if (data.isTaxInclusive) {
-          calculatedSubtotal += Math.round((item.price * item.quantity) / taxFactor);
-      } else {
-          calculatedSubtotal += item.price * item.quantity;
+          return Math.round(price / taxFactor);
       }
+      return price;
+  };
+
+  let calculatedSubtotal = 0;
+  data.items.forEach(item => {
+      const unitPrice = getPreTaxUnitPrice(item.price);
+      calculatedSubtotal += unitPrice * item.quantity;
   });
 
   const taxableAmount = Math.max(0, calculatedSubtotal - (data.discount || 0));
@@ -274,12 +278,10 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
       }
   };
 
-  // Base input style
-  const inputStyle = "bg-white text-black rounded px-1 outline-none transition w-full hover:bg-gray-50 focus:bg-blue-50 leading-snug";
-  // Underlined input style for Header
-  const underlinedInputStyle = "bg-white text-black border-b border-gray-400 rounded-none px-1 outline-none transition w-full hover:bg-gray-50 focus:border-blue-500 text-right leading-snug";
+  // Added py-1 to ensure consistent height with other cells
+  const inputStyle = "bg-white text-black rounded px-1 py-1 outline-none transition w-full hover:bg-gray-50 focus:bg-blue-50 leading-snug";
+  const underlinedInputStyle = "bg-white text-black border-b border-gray-400 rounded-none px-1 py-1 outline-none transition w-full hover:bg-gray-50 focus:border-blue-500 text-right leading-snug";
 
-  // Calculate global index offset for each page
   const getGlobalIndex = (pageIndex: number, localIndex: number) => {
       let count = 0;
       for (let i = 0; i < pageIndex; i++) {
@@ -307,7 +309,6 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                 }
                 body { margin: 0; }
             }
-            /* Hide default calendar picker */
             input[type="date"]::-webkit-calendar-picker-indicator {
                 position: absolute; top: 0; left: 0; right: 0; bottom: 0;
                 width: 100%; height: 100%; color: transparent; background: transparent; cursor: pointer;
@@ -325,14 +326,11 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                     key={pageIndex}
                     className="w-[210mm] min-h-[297mm] bg-white shadow-lg p-[8mm] flex flex-col relative font-[Noto_Sans_TC] print:shadow-none print:m-0 print:w-full page-break box-border"
                 >
-                    {/* --- Page Content Wrapper --- */}
                     <div className="flex-grow flex flex-col">
                         
-                        {/* Header Section (Only on Page 1) */}
                         {isFirstPage && (
                             <>
                                 <div className="flex justify-between border-b-2 border-black pb-1 mb-1">
-                                    {/* Left: Company Info */}
                                     <div className="flex-grow flex gap-4">
                                         <div className="shrink-0 pt-1">
                                             <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" id="logo-upload" />
@@ -352,43 +350,42 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
                                         <div className="flex-grow space-y-0">
                                             <input 
-                                            className={`text-3xl font-bold placeholder-gray-300 ${inputStyle} mb-3`} 
+                                            className={`text-[30px] font-bold placeholder-gray-300 ${inputStyle} mb-0`} 
                                             value={data.companyInfo.name}
                                             onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, name: e.target.value}})}
                                             placeholder="公司名稱"
                                             />
-                                            <div className="text-base text-gray-700 space-y-[2px]">
+                                            <div className="text-[16px] text-gray-700 space-y-0">
                                                 <div className="flex items-center gap-1">
                                                     <span className="w-12 font-medium shrink-0">地址:</span>
-                                                    <input className={`flex-1 ${inputStyle}`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex items-center gap-1 flex-1">
                                                         <span className="w-12 font-medium shrink-0">電話:</span>
-                                                        <input className={`flex-1 ${inputStyle}`} value={data.companyInfo.phone} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, phone: e.target.value}})} />
+                                                        <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.phone} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, phone: e.target.value}})} />
                                                     </div>
                                                     <div className="flex items-center gap-1 flex-1">
                                                         <span className="w-12 font-medium shrink-0">傳真:</span>
-                                                        <input className={`flex-1 ${inputStyle}`} value={data.companyInfo.fax} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, fax: e.target.value}})} />
+                                                        <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.fax} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, fax: e.target.value}})} />
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <span className="w-12 font-medium shrink-0">信箱:</span>
-                                                    <input className={`flex-1 ${inputStyle}`} value={data.companyInfo.email} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, email: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.email} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, email: e.target.value}})} />
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <span className="w-12 font-medium shrink-0">統編:</span>
-                                                    <input className={`flex-1 ${inputStyle}`} value={data.companyInfo.taxId} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, taxId: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.taxId} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, taxId: e.target.value}})} />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Right: Quotation Info (Tight width) */}
-                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between shrink-0">
-                                        <h2 className="text-[3.5rem] font-extrabold tracking-widest mb-2 text-black leading-none mt-[-10px]">報 價 單</h2>
+                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between gap-2 shrink-0 h-auto">
+                                        <h2 className="text-[58px] font-extrabold tracking-widest mb-0 text-black leading-none mt-[-10px] mr-[-0.1em] text-right">報 價 單</h2>
                                         
-                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full">
+                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full mb-[2px]">
                                             <span className="font-bold text-gray-800 text-lg text-right pb-1 whitespace-nowrap">單號:</span>
                                             <input 
                                                 className={`font-mono text-base w-[150px] ${underlinedInputStyle}`} 
@@ -439,7 +436,6 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                             </>
                         )}
 
-                        {/* Page 2+ Header Spacer */}
                         {!isFirstPage && (
                             <div className="mb-4 border-b pb-2 flex justify-between items-center text-gray-400 text-sm">
                                 <span>{data.quoteDetails.number} - (續)</span>
@@ -447,76 +443,105 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                             </div>
                         )}
 
-                        {/* Items Table */}
                         <div className="flex-grow mb-3">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="text-white print:text-white print:bg-black" style={{ backgroundColor: data.themeColor }}>
-                                        <th className="p-2 w-[5%] text-center rounded-tl-sm text-lg">#</th>
-                                        <th className="p-2 w-[40%] text-left text-lg">品名</th>
-                                        <th className="p-2 w-[20%] text-left text-lg">規格</th>
-                                        <th className="p-2 w-[8%] text-center text-lg">數量</th>
-                                        <th className="p-2 w-[12%] text-center text-lg">單價</th>
-                                        <th className="p-2 w-[12%] text-center rounded-tr-sm text-lg">金額</th>
+                                        <th className="p-2 w-[5%] text-center rounded-tl-sm text-[19px]">#</th>
+                                        <th className="p-2 w-[40%] text-left text-[19px]">品名</th>
+                                        <th className="p-2 w-[20%] text-left text-[19px]">規格</th>
+                                        <th className="p-2 w-[8%] text-center text-[19px]">數量</th>
+                                        <th className="p-2 w-[12%] text-center text-[19px]">單價</th>
+                                        <th className="p-2 w-[12%] text-center rounded-tr-sm text-[19px]">金額</th>
                                         <th className="p-2 w-[3%] print:hidden"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="text-base">
-                                {pageItems.map((item, index) => (
-                                    <tr key={item.id} className="border-b border-gray-200 group hover:bg-gray-50 print:border-gray-300">
-                                        <td className="px-1 py-[1px] text-center text-gray-500 align-top pt-2">
-                                            {/* Calculate correct global index */}
-                                            {getGlobalIndex(pageIndex, index)}
-                                        </td>
-                                        <td className="px-1 py-[1px] align-top">
-                                            <div className="flex items-center gap-2">
-                                                <input className={`font-bold text-lg ${inputStyle} flex-grow min-w-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
-                                                
-                                                {(item.description === null) && (
-                                                    <button onClick={() => updateItem(item.id, 'description', '')} className="shrink-0 text-[10px] text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 print:hidden whitespace-nowrap">+ 描述</button>
-                                                )}
-                                            </div>
-                                            
-                                            {(item.description !== null) && (
-                                                <div className="relative mt-1">
-                                                    <AutoHeightTextarea 
-                                                        className={`text-sm text-gray-500 ${inputStyle}`} 
-                                                        value={item.description || ''} 
-                                                        onChange={(e) => updateItem(item.id, 'description', e.target.value)} 
-                                                        placeholder="詳細描述..."
-                                                    />
-                                                    <button onClick={() => updateItem(item.id, 'description', null)} className="absolute -right-4 top-0 text-gray-300 hover:text-red-500 print:hidden">&times;</button>
+                                <tbody className="text-[17px]">
+                                {pageItems.map((item, index) => {
+                                    const effectiveUnitPrice = getPreTaxUnitPrice(item.price);
+                                    const rowAmount = effectiveUnitPrice * item.quantity;
+                                    const globalIndex = getGlobalIndex(pageIndex, index);
+                                    const arrayIndex = globalIndex - 1; // 0-based index for array manipulation
+                                    
+                                    return (
+                                        <tr 
+                                            key={item.id} 
+                                            className="border-b border-gray-200 group hover:bg-gray-50 print:border-gray-300"
+                                            draggable={dragActiveIndex === arrayIndex}
+                                            onDragStart={(e) => {
+                                                dragItem.current = arrayIndex;
+                                                // Optional: Set ghost image or effect
+                                                e.dataTransfer.effectAllowed = "move";
+                                            }}
+                                            onDragEnter={(e) => {
+                                                dragOverItem.current = arrayIndex;
+                                            }}
+                                            onDragEnd={handleSort}
+                                            onDragOver={(e) => e.preventDefault()}
+                                        >
+                                            {/* Text-only cells get py-2 to match input padding+height */}
+                                            <td 
+                                                className="px-1 py-2 text-center text-gray-500 align-top cursor-move select-none hover:text-gray-800 active:text-blue-500"
+                                                onMouseEnter={() => setDragActiveIndex(arrayIndex)}
+                                                onMouseLeave={() => setDragActiveIndex(null)}
+                                                onMouseDown={() => setDragActiveIndex(arrayIndex)} // Ensure touch/click works
+                                                title="按住拖曳排序"
+                                            >
+                                                {globalIndex}
+                                            </td>
+                                            {/* Input cells get p-1, inner input has py-1 */}
+                                            <td className="p-1 align-top">
+                                                <div className="flex items-center gap-2">
+                                                    <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
+                                                    
+                                                    {(item.description === null) && (
+                                                        <button onClick={() => updateItem(item.id, 'description', '')} className="shrink-0 text-[11px] text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 print:hidden whitespace-nowrap">+ 描述</button>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </td>
-                                        <td className="px-1 py-[1px] align-top">
-                                            <AutoHeightTextarea 
-                                                rows={1}
-                                                className={`text-base ${inputStyle}`} 
-                                                value={item.spec} 
-                                                onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
-                                            />
-                                        </td>
-                                        <td className="px-1 py-[1px] text-center align-top">
-                                            <input type="number" className={`text-center ${inputStyle}`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
-                                        </td>
-                                        <td className="px-1 py-[1px] align-top">
-                                            <EditablePriceCell 
-                                                value={item.price} 
-                                                onChange={(val) => updateItem(item.id, 'price', val)} 
-                                            />
-                                        </td>
-                                        <td className="px-1 py-[1px] text-right font-medium align-top pt-1 text-black">
-                                            {formatCurrency(data.isTaxInclusive ? Math.round((item.price * item.quantity) / taxFactor) : item.price * item.quantity)}
-                                        </td>
-                                        <td className="px-1 py-[1px] text-center align-top print:hidden pt-2">
-                                            <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                
+                                                {(item.description !== null) && (
+                                                    <div className="relative mt-1">
+                                                        <AutoHeightTextarea 
+                                                            className={`text-[15px] text-gray-500 ${inputStyle}`} 
+                                                            value={item.description || ''} 
+                                                            onChange={(e) => updateItem(item.id, 'description', e.target.value)} 
+                                                            placeholder="詳細描述..."
+                                                            rows={1}
+                                                        />
+                                                        <button onClick={() => updateItem(item.id, 'description', null)} className="absolute -right-4 top-0 text-gray-300 hover:text-red-500 print:hidden">&times;</button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-1 align-top">
+                                                <AutoHeightTextarea 
+                                                    rows={1}
+                                                    className={`text-[17px] ${inputStyle}`} 
+                                                    value={item.spec} 
+                                                    onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
+                                                />
+                                            </td>
+                                            <td className="p-1 text-center align-top">
+                                                <input type="number" className={`text-center ${inputStyle} text-[17px]`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                                            </td>
+                                            <td className="p-1 align-top">
+                                                <EditablePriceCell 
+                                                    value={item.price} 
+                                                    displayValue={effectiveUnitPrice}
+                                                    onChange={(val) => updateItem(item.id, 'price', val)} 
+                                                />
+                                            </td>
+                                            {/* Text-only cells get py-2 to match input padding+height */}
+                                            <td className="px-1 py-2 text-right font-medium align-top leading-snug text-black">
+                                                {formatCurrency(rowAmount)}
+                                            </td>
+                                            <td className="px-1 py-2 text-center align-top print:hidden">
+                                                <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14} /></button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 </tbody>
                             </table>
-                            {/* Add Item Button (Only on Last Page) */}
                             {isLastPage && (
                                 <button onClick={addItem} className="mt-2 text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 print:hidden opacity-50 hover:opacity-100 transition">
                                     <Plus size={16} /> 新增項目
@@ -527,19 +552,15 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
                     {/* Footer Section */}
                     
-                    {/* If NOT last page, show Continued */}
                     {!isLastPage && (
                         <div className="text-center text-gray-400 text-sm italic py-4 border-t border-dashed mt-auto">
                             (續後頁 / Continued on next page...)
                         </div>
                     )}
 
-                    {/* If Last Page, Show Full Footer */}
                     {isLastPage && (
                         <div className="mt-auto">
-                            {/* Reduced margin-bottom from mb-4 to mb-[1px] to bring divider closer */}
                             <div className="flex gap-4 mb-[1px] items-start">
-                                {/* Matched height with Seal (h-40) */}
                                 <div className="flex-grow h-40">
                                     <textarea 
                                         className={`h-full w-full resize-none ${inputStyle} text-base p-2`} 
@@ -549,7 +570,6 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     ></textarea>
                                 </div>
                                 
-                                {/* Seal */}
                                 <div className="w-48 shrink-0 flex flex-col items-center justify-center relative h-40 border border-transparent hover:border-gray-200 rounded">
                                     <input type="file" accept="image/*" onChange={handleSealUpload} className="hidden" id="seal-upload" />
                                     {data.seal ? (
@@ -566,9 +586,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     )}
                                 </div>
 
-                                {/* Calculation Stats */}
                                 <div className="min-w-[280px] w-auto shrink-0 bg-white p-3 rounded print:p-0 group">
-                                    <div className="flex justify-between py-1 text-base items-center relative whitespace-nowrap">
+                                    <div className="flex justify-between py-1 text-[17px] items-center relative whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-600">銷售金額 (Subtotal)</span>
                                             {!showDiscount && (
@@ -584,7 +603,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     </div>
                                     
                                     {showDiscount && (
-                                    <div className="flex justify-between py-1 text-base text-red-600 items-center font-bold whitespace-nowrap">
+                                    <div className="flex justify-between py-1 text-[17px] text-red-600 items-center font-bold whitespace-nowrap">
                                         <div className="flex items-center gap-1">
                                             <span>折扣 (Discount)</span>
                                             <button onClick={() => {setShowDiscount(false); setData({...data, discount: 0});}} className="text-gray-400 hover:text-red-500 print:hidden ml-1">
@@ -604,7 +623,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     </div>
                                     )}
 
-                                    <div className="flex justify-between items-center py-1 text-base whitespace-nowrap">
+                                    <div className="flex justify-between items-center py-1 text-[17px] whitespace-nowrap">
                                         <span className="text-gray-600 flex items-center gap-1">
                                             營業稅 (Tax)
                                             <span className="bg-gray-200 px-1 rounded text-xs print:hidden flex items-center">
@@ -622,7 +641,6 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                 </div>
                             </div>
 
-                            {/* Bottom Terms & Signature */}
                             <div className="border-t-2 border-gray-200 pt-2 flex gap-8 items-start mt-0">
                                 <div className="flex-grow">
                                     <h4 className="font-bold text-lg mb-3 text-gray-700">備註與條款:</h4>

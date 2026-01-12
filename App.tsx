@@ -28,9 +28,9 @@ import { isFirebaseConfigured } from './firebaseConfig';
 // --- Helper: Generate ROC Filename ---
 // Format: 民國年月日_祥鉞不鏽鋼_客戶名稱 (e.g., 1131024_祥鉞不鏽鋼_王小明)
 const getFormattedFileName = (dateStr: string, clientName: string) => {
-  if (!dateStr) return '';
+  if (!dateStr) return '報價單';
   const parts = dateStr.split('-'); // Expect YYYY-MM-DD
-  if (parts.length !== 3) return '';
+  if (parts.length !== 3) return '報價單';
   
   const year = parseInt(parts[0]) - 1911;
   const month = parts[1];
@@ -67,7 +67,7 @@ const App: React.FC = () => {
 
   // --- State ---
   const [quotation, setQuotation] = useState<QuotationData>({
-    fileName: '', // Will be auto-generated on mount
+    fileName: '', 
     companyInfo: DEFAULT_COMPANY_INFO,
     clientInfo: { name: '', contact: '', address: '', phone: '' },
     quoteDetails: {
@@ -92,9 +92,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [showFileMenu, setShowFileMenu] = useState(false);
-  
-  // Track if user manually edited the filename. If false, we auto-update it based on client/date.
-  const [isFileNameTouched, setIsFileNameTouched] = useState(false);
 
   // --- Delete Modal State ---
   const [deleteModal, setDeleteModal] = useState<{
@@ -119,14 +116,6 @@ const App: React.FC = () => {
     localStorage.setItem('app_theme_color', quotation.themeColor);
   }, [quotation.themeColor]);
 
-  // Auto-update filename based on Client Name and Date (if not manually touched)
-  useEffect(() => {
-    if (!isFileNameTouched) {
-      const newName = getFormattedFileName(quotation.quoteDetails.date, quotation.clientInfo.name);
-      setQuotation(prev => ({ ...prev, fileName: newName }));
-    }
-  }, [quotation.clientInfo.name, quotation.quoteDetails.date, isFileNameTouched]);
-
   // --- Helpers ---
   const showStatus = (msg: string, isError = false) => {
     setStatusMsg(msg);
@@ -144,11 +133,9 @@ const App: React.FC = () => {
   };
 
   const handleCreateNew = () => {
-    setIsFileNameTouched(false); // Reset touch state to enable auto-generation
-    
     setQuotation({
       ...quotation, // Keeps current theme
-      fileName: '', // Will be filled by effect
+      fileName: '', 
       items: [{ id: Date.now(), name: '', spec: '', description: null, quantity: 1, price: 0 }],
       clientInfo: { name: '', contact: '', address: '', phone: '' },
       discount: 0,
@@ -172,11 +159,6 @@ const App: React.FC = () => {
     try {
       await saveQuotationToCloud(quotation);
       await loadFileList();
-      
-      // If saving successfully, we consider the filename "locked" or "touched" 
-      // so it doesn't change unexpectedly if they continue editing.
-      setIsFileNameTouched(true);
-      
       showStatus('儲存成功');
     } catch (error) {
       console.error(error);
@@ -187,7 +169,6 @@ const App: React.FC = () => {
   };
 
   const handleLoad = (file: QuotationData) => {
-    setIsFileNameTouched(true); // Lock filename for loaded files
     setQuotation({
       ...file,
       themeColor: localStorage.getItem('app_theme_color') || file.themeColor // Force global theme
@@ -235,11 +216,17 @@ const App: React.FC = () => {
   };
 
   const handlePrint = () => {
-    const title = document.title;
-    // Set browser tab title for PDF filename default
-    document.title = quotation.fileName || `報價單_${quotation.clientInfo.name}`;
+    const originalTitle = document.title;
+    
+    // Generate the required format just for the print action
+    // "民國年月日_祥鉞不鏽鋼_客戶名稱"
+    const printFileName = getFormattedFileName(quotation.quoteDetails.date, quotation.clientInfo.name);
+    
+    document.title = printFileName;
     window.print();
-    document.title = title;
+    
+    // Restore original title (or default)
+    document.title = originalTitle;
   };
 
   // --- Item Handlers ---
@@ -298,10 +285,7 @@ const App: React.FC = () => {
                     <input 
                       className="bg-transparent outline-none text-sm font-medium w-32 md:w-64 placeholder-gray-400" 
                       value={quotation.fileName}
-                      onChange={(e) => {
-                        setQuotation({...quotation, fileName: e.target.value});
-                        setIsFileNameTouched(true); // User manually edited, stop auto-update
-                      }}
+                      onChange={(e) => setQuotation({...quotation, fileName: e.target.value})}
                       onFocus={() => setShowFileMenu(true)}
                       placeholder="檔案名稱"
                     />
