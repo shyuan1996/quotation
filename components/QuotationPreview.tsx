@@ -324,7 +324,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
             return (
                 <div 
                     key={pageIndex}
-                    className="w-[210mm] min-h-[297mm] bg-white shadow-lg p-[8mm] flex flex-col relative font-[Noto_Sans_TC] print:shadow-none print:m-0 print:w-full page-break box-border"
+                    /* Adjusted padding: top 20px, bottom 5px as requested */
+                    className="w-[210mm] min-h-[297mm] bg-white shadow-lg px-[8mm] pt-[20px] pb-[5px] flex flex-col relative font-[Noto_Sans_TC] print:shadow-none print:m-0 print:w-full page-break box-border"
                 >
                     <div className="flex-grow flex flex-col">
                         
@@ -355,7 +356,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, name: e.target.value}})}
                                             placeholder="公司名稱"
                                             />
-                                            <div className="text-[16px] text-gray-700 space-y-0">
+                                            {/* Adjusted spacing to gap-0 */}
+                                            <div className="text-[16px] text-gray-700 flex flex-col gap-0">
                                                 <div className="flex items-center gap-1">
                                                     <span className="w-12 font-medium shrink-0">地址:</span>
                                                     <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
@@ -382,10 +384,13 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         </div>
                                     </div>
 
-                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between gap-2 shrink-0 h-auto">
-                                        <h2 className="text-[58px] font-extrabold tracking-widest mb-0 text-black leading-none mt-[-10px] mr-[-0.1em] text-right">報 價 單</h2>
+                                    {/* Changed gap-2 to gap-0 */}
+                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between gap-0 shrink-0 h-auto">
+                                        {/* Changed mt-[-10px] to mt-[-5px] */}
+                                        <h2 className="text-[58px] font-extrabold tracking-widest mb-0 text-black leading-none mt-[-5px] mr-[-0.1em] text-right">報 價 單</h2>
                                         
-                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full mb-[2px]">
+                                        {/* Adjusted margin to -15px to move up 10px more from -5px, and mb-[20px] for bottom spacing */}
+                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full mb-[20px] mt-[-15px]">
                                             <span className="font-bold text-gray-800 text-lg text-right pb-1 whitespace-nowrap">單號:</span>
                                             <input 
                                                 className={`font-mono text-base w-[150px] ${underlinedInputStyle}`} 
@@ -491,7 +496,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             </td>
                                             {/* Input cells get p-1, inner input has py-1 */}
                                             <td className="px-1 py-[1px] align-baseline">
-                                                <div className="flex items-baseline gap-2">
+                                                {/* Added mb-0 to wrapper to remove any bottom margin from the flex container */}
+                                                <div className="flex items-baseline gap-2 mb-0">
                                                     <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0 py-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
                                                     
                                                     {(item.description === null) && (
@@ -502,7 +508,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 {(item.description !== null) && (
                                                     <div className="relative mt-0">
                                                         <AutoHeightTextarea 
-                                                            className={`text-[15px] text-gray-500 ${inputStyle} py-0`} 
+                                                            className={`text-[15px] text-gray-500 ${inputStyle} py-0 leading-none block`} 
                                                             value={item.description || ''} 
                                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)} 
                                                             placeholder="詳細描述..."
@@ -654,7 +660,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         onChange={(e) => setData({...data, notes: e.target.value})}
                                     />
                                 </div>
-                                <div className="w-64 shrink-0 flex flex-col gap-6"> 
+                                {/* Footer Right Column: Changed gap-6 to gap-0 */}
+                                <div className="w-64 shrink-0 flex flex-col gap-0"> 
                                     <div className="flex flex-col"> 
                                         <div className="h-[52px] border-b border-black mb-1"></div>
                                         <div className="text-center text-base">客戶簽名</div>
