@@ -14,7 +14,11 @@ import {
   FilePlus,
   Loader2,
   Check,
-  Tag
+  Tag,
+  Lock,
+  LogOut,
+  User,
+  ArrowRight
 } from 'lucide-react';
 
 export { 
@@ -32,5 +36,9 @@ export {
   FilePlus,
   Loader2,
   Check,
-  Tag
+  Tag,
+  Lock,
+  LogOut,
+  User,
+  ArrowRight
 };

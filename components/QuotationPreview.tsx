@@ -308,6 +308,18 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                     min-height: 297mm;
                 }
                 body { margin: 0; }
+
+                /* Revised input styling for print */
+                input:not(.keep-border), textarea, select {
+                    background: transparent !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    resize: none !important;
+                }
+                /* Ensure underlines show up */
+                .keep-border {
+                    border-bottom: 1px solid #9ca3af !important;
+                }
             }
             input[type="date"]::-webkit-calendar-picker-indicator {
                 position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -393,7 +405,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full mb-[20px] mt-[-15px]">
                                             <span className="font-bold text-gray-800 text-lg text-right pb-1 whitespace-nowrap">單號:</span>
                                             <input 
-                                                className={`font-mono text-base w-[150px] ${underlinedInputStyle}`} 
+                                                className={`font-mono text-base w-[150px] ${underlinedInputStyle} keep-border`} 
                                                 value={data.quoteDetails.number} 
                                                 onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, number: e.target.value}})} 
                                             />
@@ -402,7 +414,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             <div className="relative w-[150px]">
                                                 <input 
                                                     type="date" 
-                                                    className={`font-mono text-base relative z-10 cursor-pointer ${underlinedInputStyle}`} 
+                                                    className={`font-mono text-base relative z-10 cursor-pointer ${underlinedInputStyle} keep-border`} 
                                                     value={data.quoteDetails.date} 
                                                     onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, date: e.target.value}})} 
                                                 />
@@ -411,9 +423,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     </div>
                                 </div>
 
-                                <div className="mb-2 flex gap-4 items-start pt-1">
+                                <div className="mb-0 flex gap-4 items-start pt-0">
                                     <div className="flex-1">
-                                        <label className="text-sm text-gray-500 block mb-1">客戶名稱</label>
+                                        <label className="text-sm text-gray-500 block mb-0">客戶名稱</label>
                                         <AutoHeightTextarea 
                                             className={`w-full font-bold text-xl ${inputStyle}`} 
                                             rows={1}
@@ -423,12 +435,12 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         />
                                     </div>
                                     <div className="w-1/4">
-                                        <label className="text-sm text-gray-500 block mb-1">電話</label>
+                                        <label className="text-sm text-gray-500 block mb-0">電話</label>
                                         <input className={`text-lg ${inputStyle}`} 
                                             value={data.clientInfo.phone} onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, phone: e.target.value}})} placeholder="電話" />
                                     </div>
                                     <div className="w-1/3">
-                                        <label className="text-sm text-gray-500 block mb-1">地址</label>
+                                        <label className="text-sm text-gray-500 block mb-0">地址</label>
                                         <AutoHeightTextarea 
                                             className={`text-lg w-full ${inputStyle}`} 
                                             value={data.clientInfo.address} 
@@ -651,7 +663,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
                             <div className="border-t-2 border-gray-200 pt-2 flex gap-8 items-start mt-0">
                                 <div className="flex-grow">
-                                    <h4 className="font-bold text-lg mb-3 text-gray-700">備註與條款:</h4>
+                                    <h4 className="font-bold text-lg mb-0 text-gray-700">備註與條款:</h4>
                                     <AutoHeightTextarea 
                                         autoResize={false}
                                         rows={6}
