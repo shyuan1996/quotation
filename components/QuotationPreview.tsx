@@ -97,7 +97,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
                  <input 
                     ref={inputRef}
                     type="number"
-                    className="text-right w-24 bg-white outline-none border-b border-blue-500 m-0 px-1 py-1 text-black font-medium leading-snug text-[17px]" 
+                    className="text-right w-24 bg-white outline-none border-b border-blue-500 m-0 px-1 py-0 text-black font-medium leading-snug text-[17px]" 
                     value={value === 0 ? '' : value} 
                     onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
                     onBlur={() => setIsEditing(false)}
@@ -113,7 +113,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
     return (
         <div 
             onClick={() => setIsEditing(true)}
-            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-1 font-medium text-black h-full flex items-baseline justify-end leading-snug text-[17px]"
+            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-0 font-medium text-black h-full flex items-baseline justify-end leading-snug text-[17px]"
         >
             {formatCurrency(showValue)}
         </div>
@@ -492,7 +492,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             {/* Input cells get p-1, inner input has py-1 */}
                                             <td className="px-1 py-[1px] align-baseline">
                                                 <div className="flex items-baseline gap-2">
-                                                    <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
+                                                    <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0 py-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
                                                     
                                                     {(item.description === null) && (
                                                         <button onClick={() => updateItem(item.id, 'description', '')} className="shrink-0 text-[11px] text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 print:hidden whitespace-nowrap">+ 描述</button>
@@ -516,14 +516,14 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 <div className="flex items-baseline">
                                                     <AutoHeightTextarea 
                                                         rows={1}
-                                                        className={`text-[16px] ${inputStyle}`} 
+                                                        className={`text-[16px] ${inputStyle} py-0`} 
                                                         value={item.spec} 
                                                         onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
                                                     />
                                                 </div>
                                             </td>
                                             <td className="px-1 py-[1px] text-center align-baseline">
-                                                <input type="number" className={`text-center ${inputStyle} text-[17px]`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-0`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
                                             </td>
                                             <td className="px-1 py-[1px] align-baseline">
                                                 <EditablePriceCell 
