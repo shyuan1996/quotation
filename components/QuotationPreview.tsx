@@ -93,27 +93,25 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
 
     if (isEditing) {
         return (
-            <div className="flex items-baseline justify-end w-full h-full">
-                 <input 
-                    ref={inputRef}
-                    type="number"
-                    className="text-right w-24 bg-white outline-none border-b border-blue-500 m-0 px-1 py-0 text-black font-medium leading-snug text-[17px]" 
-                    value={value === 0 ? '' : value} 
-                    onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-                    onBlur={() => setIsEditing(false)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') setIsEditing(false);
-                    }}
-                    placeholder="0"
-                />
-            </div>
+            <input 
+                ref={inputRef}
+                type="number"
+                className="text-right w-full bg-white outline-none border-b border-blue-500 m-0 px-1 py-[1px] h-[24px] leading-[22px] text-black font-medium text-[17px] block box-border" 
+                value={value === 0 ? '' : value} 
+                onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                onBlur={() => setIsEditing(false)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') setIsEditing(false);
+                }}
+                placeholder="0"
+            />
         );
     }
 
     return (
         <div 
             onClick={() => setIsEditing(true)}
-            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-0 font-medium text-black h-full flex items-baseline justify-end leading-snug text-[17px]"
+            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-[1px] h-[24px] leading-[22px] font-medium text-black text-[17px] block box-border"
         >
             {formatCurrency(showValue)}
         </div>
@@ -161,14 +159,14 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
   // --- Dynamic Pagination Logic ---
   const pages = useMemo(() => {
       // Constants for A4 layout (Approximate pixels based on 96DPI and Tailwind styles)
-      const A4_CONTENT_HEIGHT = 1050; 
+      const A4_CONTENT_HEIGHT = 1100; 
       
-      const HEADER_HEIGHT = 380; 
-      const FOOTER_HEIGHT = 320; 
-      const PAGE_2_HEADER_HEIGHT = 60; 
+      const HEADER_HEIGHT = 200; 
+      const FOOTER_HEIGHT = 200; 
+      const PAGE_2_HEADER_HEIGHT = 40; 
       const ROW_BASE_HEIGHT = 45; 
-      const ROW_LINE_HEIGHT = 24; 
-      const BOTTOM_SPACER = 50; 
+      const ROW_LINE_HEIGHT = 25; 
+      const BOTTOM_SPACER = 20; 
 
       const getItemHeight = (item: QuoteItem) => {
           const countLines = (text: string | null, approxCharsPerLine: number) => {
@@ -181,9 +179,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
               return totalLines;
           };
 
-          const nameLines = countLines(item.name, 22); 
-          const descLines = countLines(item.description, 35); 
-          const specLines = countLines(item.spec, 15); 
+          const nameLines = countLines(item.name, 16); 
+          const descLines = countLines(item.description, 20); 
+          const specLines = countLines(item.spec, 9); 
           
           const nameBlockLines = nameLines + (item.description ? descLines : 0);
           const maxLines = Math.max(nameBlockLines, specLines, 1);
@@ -337,7 +335,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                 <div 
                     key={pageIndex}
                     /* Adjusted padding: top 20px, bottom 5px as requested */
-                    className="w-[210mm] min-h-[297mm] bg-white shadow-lg px-[8mm] pt-[20px] pb-[5px] flex flex-col relative font-[Noto_Sans_TC] print:shadow-none print:m-0 print:w-full page-break box-border"
+                    className="w-[210mm] min-h-[297mm] bg-white shadow-lg px-[8mm] pt-[20px] pb-[5px] flex flex-col relative font-[Noto_Sans_TC] print:shadow-none print:m-0 print:w-[210mm] page-break box-border"
                 >
                     <div className="flex-grow flex flex-col">
                         
@@ -363,58 +361,55 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
                                         <div className="flex-grow space-y-0">
                                             <input 
-                                            className={`text-[30px] font-bold placeholder-gray-300 ${inputStyle} mb-0`} 
+                                            className={`text-[28px] font-bold placeholder-gray-300 ${inputStyle} mb-0 py-0 leading-none h-8 -ml-1`} 
                                             value={data.companyInfo.name}
                                             onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, name: e.target.value}})}
                                             placeholder="公司名稱"
                                             />
                                             {/* Adjusted spacing to gap-0 */}
-                                            <div className="text-[16px] text-gray-700 flex flex-col gap-0">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="w-12 font-medium shrink-0">地址:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
+                                            <div className="text-[15px] text-gray-700 flex flex-col gap-0 leading-[1.1]">
+                                                <div className="flex items-center gap-1 h-6">
+                                                    <span className="w-12 font-medium shrink-0 pl-1">地址:</span>
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <div className="flex items-center gap-1 flex-1">
-                                                        <span className="w-12 font-medium shrink-0">電話:</span>
-                                                        <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.phone} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, phone: e.target.value}})} />
+                                                <div className="flex items-center gap-4 h-6">
+                                                    <div className="flex items-center gap-1 flex-1 h-full">
+                                                        <span className="w-12 font-medium shrink-0 pl-1">電話:</span>
+                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.phone} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, phone: e.target.value}})} />
                                                     </div>
-                                                    <div className="flex items-center gap-1 flex-1">
-                                                        <span className="w-12 font-medium shrink-0">傳真:</span>
-                                                        <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.fax} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, fax: e.target.value}})} />
+                                                    <div className="flex items-center gap-1 flex-1 h-full">
+                                                        <span className="w-12 font-medium shrink-0 pl-1">傳真:</span>
+                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.fax} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, fax: e.target.value}})} />
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="w-12 font-medium shrink-0">信箱:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.email} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, email: e.target.value}})} />
+                                                <div className="flex items-center gap-1 h-6">
+                                                    <span className="w-12 font-medium shrink-0 pl-1">信箱:</span>
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.email} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, email: e.target.value}})} />
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="w-12 font-medium shrink-0">統編:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0`} value={data.companyInfo.taxId} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, taxId: e.target.value}})} />
+                                                <div className="flex items-center gap-1 h-6">
+                                                    <span className="w-12 font-medium shrink-0 pl-1">統編:</span>
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.taxId} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, taxId: e.target.value}})} />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Changed gap-2 to gap-0 */}
-                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between gap-0 shrink-0 h-auto">
-                                        {/* Changed mt-[-10px] to mt-[-5px] */}
+                                    <div className="w-auto ml-auto text-right flex flex-col items-end justify-between gap-0 shrink-0 h-full">
                                         <h2 className="text-[58px] font-extrabold tracking-widest mb-0 text-black leading-none mt-[-5px] mr-[-0.1em] text-right">報 價 單</h2>
                                         
-                                        {/* Adjusted margin to -15px to move up 10px more from -5px, and mb-[20px] for bottom spacing */}
-                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-1 items-center justify-end text-base w-full mb-[20px] mt-[-15px]">
-                                            <span className="font-bold text-gray-800 text-lg text-right pb-1 whitespace-nowrap">單號:</span>
+                                        <div className="grid grid-cols-[auto_150px] gap-x-2 gap-y-[2px] items-end justify-end text-base w-full mb-0 mt-[17px]">
+                                            <span className="font-bold text-gray-800 text-[17px] text-right leading-none pb-[2px] whitespace-nowrap">單號:</span>
                                             <input 
-                                                className={`font-mono text-base w-[150px] ${underlinedInputStyle} keep-border`} 
+                                                className={`font-mono text-base w-[150px] py-0 h-6 leading-none ${underlinedInputStyle} keep-border mb-[2px]`} 
                                                 value={data.quoteDetails.number} 
                                                 onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, number: e.target.value}})} 
                                             />
                                             
-                                            <span className="font-bold text-gray-800 text-lg text-right pb-1 whitespace-nowrap">日期:</span>
-                                            <div className="relative w-[150px]">
+                                            <span className="font-bold text-gray-800 text-[17px] text-right leading-none pb-[2px] whitespace-nowrap">日期:</span>
+                                            <div className="relative w-[150px] mb-[2px]">
                                                 <input 
                                                     type="date" 
-                                                    className={`font-mono text-base relative z-10 cursor-pointer ${underlinedInputStyle} keep-border`} 
+                                                    className={`font-mono text-base relative z-10 cursor-pointer py-0 h-6 leading-none w-full ${underlinedInputStyle} keep-border`} 
                                                     value={data.quoteDetails.date} 
                                                     onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, date: e.target.value}})} 
                                                 />
@@ -423,26 +418,26 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     </div>
                                 </div>
 
-                                <div className="mb-0 flex gap-4 items-start pt-0">
-                                    <div className="flex-1">
-                                        <label className="text-sm text-gray-500 block mb-0">客戶名稱</label>
+                                <div className="mb-0 grid grid-cols-[3fr_1.5fr_2.5fr] gap-x-4 items-start pt-0 mt-0">
+                                    <div>
+                                        <label className="text-xs text-gray-500 block mb-0 leading-none">客戶名稱</label>
                                         <AutoHeightTextarea 
-                                            className={`w-full font-bold text-xl ${inputStyle}`} 
+                                            className={`w-full font-bold text-[19px] ${inputStyle} py-0 leading-tight h-[28px] overflow-hidden min-h-0 bg-transparent block`} 
                                             rows={1}
                                             value={data.clientInfo.name} 
                                             onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, name: e.target.value}})}
                                             placeholder="輸入客戶名稱"
                                         />
                                     </div>
-                                    <div className="w-1/4">
-                                        <label className="text-sm text-gray-500 block mb-0">電話</label>
-                                        <input className={`text-lg ${inputStyle}`} 
+                                    <div>
+                                        <label className="text-xs text-gray-500 block mb-0 leading-none">電話</label>
+                                        <input className={`text-[17px] w-full ${inputStyle} py-0 leading-tight h-[28px]`} 
                                             value={data.clientInfo.phone} onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, phone: e.target.value}})} placeholder="電話" />
                                     </div>
-                                    <div className="w-1/3">
-                                        <label className="text-sm text-gray-500 block mb-0">地址</label>
+                                    <div>
+                                        <label className="text-xs text-gray-500 block mb-0 leading-none">地址</label>
                                         <AutoHeightTextarea 
-                                            className={`text-lg w-full ${inputStyle}`} 
+                                            className={`text-[17px] w-full ${inputStyle} py-0 leading-tight h-[28px] overflow-hidden min-h-0 block`} 
                                             value={data.clientInfo.address} 
                                             onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, address: e.target.value}})} 
                                             placeholder="地址" 
@@ -483,7 +478,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="border-b border-gray-200 group hover:bg-gray-50 print:border-gray-300"
+                                            className="border-b border-gray-200 group hover:bg-gray-50 print:border-gray-300 break-inside-avoid print:break-inside-avoid-page"
                                             draggable={dragActiveIndex === arrayIndex}
                                             onDragStart={(e) => {
                                                 dragItem.current = arrayIndex;
@@ -496,9 +491,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             onDragEnd={handleSort}
                                             onDragOver={(e) => e.preventDefault()}
                                         >
-                                            {/* Text-only cells get py-2 to match input padding+height */}
+                                            {/* Text-only cells get 0 padding top/bottom */}
                                             <td 
-                                                className="px-2 py-[1px] text-center text-gray-500 align-baseline cursor-move select-none hover:text-gray-800 active:text-blue-500"
+                                                className="px-2 py-0 text-center text-gray-500 align-baseline cursor-move select-none hover:text-gray-800 active:text-blue-500"
                                                 onMouseEnter={() => setDragActiveIndex(arrayIndex)}
                                                 onMouseLeave={() => setDragActiveIndex(null)}
                                                 onMouseDown={() => setDragActiveIndex(arrayIndex)} // Ensure touch/click works
@@ -506,9 +501,8 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             >
                                                 {globalIndex}
                                             </td>
-                                            {/* Input cells get p-1, inner input has py-1 */}
-                                            <td className="px-1 py-[1px] align-baseline">
-                                                {/* Added mb-0 to wrapper to remove any bottom margin from the flex container */}
+                                            {/* Input cells get py-0 */}
+                                            <td className="px-1 py-0 align-baseline">
                                                 <div className="flex items-baseline gap-2 mb-0">
                                                     <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0 py-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
                                                     
@@ -530,7 +524,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-1 py-[1px] align-baseline">
+                                            <td className="px-1 py-0 align-baseline">
                                                 <div className="flex items-baseline">
                                                     <AutoHeightTextarea 
                                                         rows={1}
@@ -540,21 +534,20 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                     />
                                                 </div>
                                             </td>
-                                            <td className="px-1 py-[1px] text-center align-baseline">
-                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-0`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                                            <td className="px-1 py-0 text-center align-baseline">
+                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-[1px] h-[24px] leading-[22px] block box-border m-0`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
                                             </td>
-                                            <td className="px-1 py-[1px] align-baseline">
+                                            <td className="px-1 py-0 align-baseline">
                                                 <EditablePriceCell 
                                                     value={item.price} 
                                                     displayValue={effectiveUnitPrice}
                                                     onChange={(val) => updateItem(item.id, 'price', val)} 
                                                 />
                                             </td>
-                                            {/* Text-only cells get py-2 to match input padding+height */}
-                                            <td className="px-2 py-[1px] text-right font-medium align-baseline leading-snug text-black">
+                                            <td className="px-2 py-0 text-right font-medium align-baseline leading-snug text-black">
                                                 {formatCurrency(rowAmount)}
                                             </td>
-                                            <td className="px-2 py-[1px] text-center align-top print:hidden">
+                                            <td className="px-2 py-0 text-center align-top print:hidden">
                                                 <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14} /></button>
                                             </td>
                                         </tr>
@@ -580,10 +573,10 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
                     {isLastPage && (
                         <div className="mt-auto">
-                            <div className="flex gap-4 mb-[1px] items-start">
-                                <div className="flex-grow h-40">
+                            <div className="flex gap-0 justify-between mb-[1px] items-start">
+                                <div className="flex-grow min-w-0 h-40 w-full">
                                     <textarea 
-                                        className={`h-full w-full resize-none ${inputStyle} text-base p-2`} 
+                                        className={`h-full w-full resize-none ${inputStyle} text-base p-2 overflow-hidden block box-border`} 
                                         placeholder="額外備註 (Optional)..."
                                         value={data.extraNote}
                                         onChange={(e) => setData({...data, extraNote: e.target.value})}
@@ -606,7 +599,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     )}
                                 </div>
 
-                                <div className="min-w-[280px] w-auto shrink-0 bg-white p-3 rounded print:p-0 group">
+                                <div className="min-w-[280px] w-auto shrink-0 bg-white p-3 rounded group print:border print:border-gray-300">
                                     <div className="flex justify-between py-1 text-[17px] items-center relative whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-600">銷售金額 (Subtotal)</span>
