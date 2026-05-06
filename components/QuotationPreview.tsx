@@ -96,7 +96,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
             <input 
                 ref={inputRef}
                 type="number"
-                className="text-right w-full bg-white outline-none border-b border-blue-500 m-0 px-1 py-[1px] h-[24px] leading-[22px] text-black font-medium text-[17px] block box-border" 
+                className="text-right w-full bg-white outline-none border-b border-blue-500 m-0 px-1 py-0 h-[32px] leading-[32px] text-black font-medium text-[17px] block box-border" 
                 value={value === 0 ? '' : value} 
                 onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
                 onBlur={() => setIsEditing(false)}
@@ -111,7 +111,7 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
     return (
         <div 
             onClick={() => setIsEditing(true)}
-            className="text-right w-full cursor-text hover:bg-gray-100 rounded px-1 py-[1px] h-[24px] leading-[22px] font-medium text-black text-[17px] block box-border"
+            className="text-right w-full cursor-text hover:bg-gray-50 bg-white rounded px-1 py-0 h-[32px] leading-[32px] font-medium text-black text-[17px] block box-border border border-transparent flex items-center justify-end"
         >
             {formatCurrency(showValue)}
         </div>
@@ -502,9 +502,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 {globalIndex}
                                             </td>
                                             {/* Input cells get py-0 */}
-                                            <td className="px-1 py-0 align-baseline">
-                                                <div className="flex items-baseline gap-2 mb-0">
-                                                    <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0 py-0`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
+                                            <td className="px-1 py-0 align-top">
+                                                <div className="flex items-start gap-2 mb-0">
+                                                    <input className={`font-bold text-[19px] ${inputStyle} flex-grow min-w-0 py-0 leading-none h-auto`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="項目名稱" />
                                                     
                                                     {(item.description === null) && (
                                                         <button onClick={() => updateItem(item.id, 'description', '')} className="shrink-0 text-[11px] text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 print:hidden whitespace-nowrap">+ 描述</button>
@@ -512,9 +512,9 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 </div>
                                                 
                                                 {(item.description !== null) && (
-                                                    <div className="relative mt-0">
+                                                    <div className="relative mt-0 border-none m-0">
                                                         <AutoHeightTextarea 
-                                                            className={`text-[15px] text-gray-500 ${inputStyle} py-0 leading-none block`} 
+                                                            className={`text-[15px] text-gray-500 ${inputStyle} py-0 leading-none block h-auto`} 
                                                             value={item.description || ''} 
                                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)} 
                                                             placeholder="詳細描述..."
@@ -524,28 +524,30 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-1 py-0 align-baseline">
-                                                <div className="flex items-baseline">
+                                            <td className="px-1 py-0 align-top">
+                                                <div className="flex items-start">
                                                     <AutoHeightTextarea 
                                                         rows={1}
-                                                        className={`text-[16px] ${inputStyle} py-0`} 
+                                                        className={`text-[17px] ${inputStyle} py-0 leading-none h-auto`} 
                                                         value={item.spec} 
                                                         onChange={(e) => updateItem(item.id, 'spec', e.target.value)} 
                                                     />
                                                 </div>
                                             </td>
-                                            <td className="px-1 py-0 text-center align-baseline">
-                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-[1px] h-[24px] leading-[22px] block box-border m-0`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                                            <td className="px-1 py-0 text-center align-top">
+                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-0 h-[32px] leading-[32px] block box-border m-0 border border-transparent`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
                                             </td>
-                                            <td className="px-1 py-0 align-baseline">
+                                            <td className="px-1 py-0 align-top">
                                                 <EditablePriceCell 
                                                     value={item.price} 
                                                     displayValue={effectiveUnitPrice}
                                                     onChange={(val) => updateItem(item.id, 'price', val)} 
                                                 />
                                             </td>
-                                            <td className="px-2 py-0 text-right font-medium align-baseline leading-snug text-black">
-                                                {formatCurrency(rowAmount)}
+                                            <td className="px-2 py-0 text-right font-medium align-top leading-none text-black">
+                                                <div className="flex items-center justify-end h-[32px] leading-[32px] border border-transparent">
+                                                    {formatCurrency(rowAmount)}
+                                                </div>
                                             </td>
                                             <td className="px-2 py-0 text-center align-top print:hidden">
                                                 <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14} /></button>
@@ -599,7 +601,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     )}
                                 </div>
 
-                                <div className="min-w-[280px] w-auto shrink-0 bg-white p-3 rounded group print:border print:border-gray-300">
+                                <div className="min-w-[280px] w-auto shrink-0 bg-white p-3 rounded group border border-transparent">
                                     <div className="flex justify-between py-1 text-[17px] items-center relative whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-600">銷售金額 (Subtotal)</span>
