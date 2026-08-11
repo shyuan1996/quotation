@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/quotations/{quotationId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
+    // Do not leave the legacy top-level collection readable after migration.
+    match /quotations/{quotationId} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, User, ArrowRight, Loader2 } from './Icons';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth, isFirebaseConfigured } from '../firebaseConfig';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -16,6 +16,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isFirebaseConfigured || !auth) {
+      setError('尚未設定 Firebase，請先建立 .env.local');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -26,12 +32,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       await signInWithEmailAndPassword(auth, emailToAuth, password);
       // Login successful
       onLogin();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login failed:", err);
+      const errorCode = err && typeof err === 'object' && 'code' in err
+        ? String(err.code)
+        : '';
       // Provide user-friendly error messages
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
         setError('帳號或密碼錯誤');
-      } else if (err.code === 'auth/too-many-requests') {
+      } else if (errorCode === 'auth/too-many-requests') {
         setError('嘗試次數過多，請稍後再試');
       } else {
         setError('登入失敗，請檢查網路連線');
@@ -56,6 +65,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         {/* Form Section */}
         <div className="p-8 pt-10">
           <form onSubmit={handleLogin} className="space-y-6">
+            {!isFirebaseConfigured && (
+              <div className="bg-orange-50 text-orange-700 text-sm p-3 rounded-lg" role="alert">
+                請先複製 <code>.env.example</code> 為 <code>.env.local</code> 並填入 Firebase 設定。
+              </div>
+            )}
             
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 ml-1 block">帳號 Account</label>
@@ -65,6 +79,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </div>
                 <input
                   type="text"
+                  autoComplete="username"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -82,6 +97,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </div>
                 <input
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -99,7 +115,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isFirebaseConfigured}
               className="w-full flex items-center justify-center py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-lg shadow-md hover:shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed font-medium text-lg"
             >
               {loading ? (

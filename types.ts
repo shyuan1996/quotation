@@ -21,7 +21,9 @@ export interface QuoteDetails {
 }
 
 export interface QuoteItem {
-  id: number;
+  // Keep compatibility with older documents that used numeric IDs while
+  // allowing new items to use collision-resistant string IDs.
+  id: string | number;
   name: string;
   spec: string;
   description: string | null;
@@ -46,6 +48,14 @@ export interface QuotationData {
   isTaxInclusive: boolean;
   updatedAt?: number;
 }
+
+export const createQuoteItemId = (): string => {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 export const DEFAULT_COMPANY_INFO: CompanyInfo = {
   name: '祥鉞餐飲設備股份有限公司',

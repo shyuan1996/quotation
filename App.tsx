@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { 
   QuotationData, 
   DEFAULT_COMPANY_INFO, 
   DEFAULT_NOTES, 
-  QuoteItem 
+  QuoteItem,
+  createQuoteItemId,
 } from './types';
 import { QuotationPreview } from './components/QuotationPreview';
 import { LoginPage } from './components/LoginPage';
@@ -31,17 +32,66 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 // --- Helper: Generate ROC Filename ---
 // Format: 民國年月日_祥鉞不鏽鋼_客戶名稱 (e.g., 1131024_祥鉞不鏽鋼_王小明)
 const getFormattedFileName = (dateStr: string, clientName: string) => {
-  if (!dateStr) return '報價單';
-  const parts = dateStr.split('-'); // Expect YYYY-MM-DD
-  if (parts.length !== 3) return '報價單';
-  
-  const year = parseInt(parts[0]) - 1911;
-  const month = parts[1];
-  const day = parts[2];
-  const cName = clientName.trim() || '客戶名稱';
-  
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return '報價單';
+
+  const year = Number(match[1]) - 1911;
+  const month = match[2];
+  const day = match[3];
+  const cName = (clientName.trim() || '客戶名稱')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .slice(0, 80);
+
   return `${year}${month}${day}_祥鉞不鏽鋼_${cName}`;
 };
+
+const getLocalDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const createQuoteNumber = () => {
+  const now = new Date();
+  return `Q-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}001`;
+};
+
+const createQuoteItem = (): QuoteItem => ({
+  id: createQuoteItemId(),
+  name: '',
+  spec: '',
+  description: null,
+  quantity: 1,
+  price: 0,
+});
+
+const createInitialQuotation = (themeColor: string): QuotationData => ({
+  fileName: '',
+  companyInfo: { ...DEFAULT_COMPANY_INFO },
+  clientInfo: { name: '', contact: '', address: '', phone: '' },
+  quoteDetails: {
+    number: createQuoteNumber(),
+    date: getLocalDate(),
+    taxRate: 5,
+  },
+  items: [{
+    ...createQuoteItem(),
+    name: '不鏽鋼工作台',
+    spec: '120x60x80cm, SUS304',
+    quantity: 1,
+    price: 8500,
+  }],
+  themeColor,
+  logo: null,
+  seal: null,
+  salesPerson: '簡呈光 0923-866-222',
+  notes: DEFAULT_NOTES,
+  extraNote: '',
+  discount: 0,
+  isTaxInclusive: false,
+});
 
 // --- Math Captcha Helper ---
 const generateMathProblem = () => {
@@ -69,36 +119,18 @@ const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  // --- Init State from LocalStorage for Theme ---
-  const savedTheme = localStorage.getItem('app_theme_color') || '#1f2937';
-
   // --- State ---
-  const [quotation, setQuotation] = useState<QuotationData>({
-    fileName: '', 
-    companyInfo: DEFAULT_COMPANY_INFO,
-    clientInfo: { name: '', contact: '', address: '', phone: '' },
-    quoteDetails: {
-      number: `Q-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}001`,
-      date: new Date().toISOString().split('T')[0],
-      taxRate: 5,
-    },
-    items: [
-      { id: 1, name: '不鏽鋼工作台', spec: '120x60x80cm, SUS304', description: null, quantity: 1, price: 8500 },
-    ],
-    themeColor: savedTheme,
-    logo: null,
-    seal: null,
-    salesPerson: '簡呈光 0923-866-222',
-    notes: DEFAULT_NOTES,
-    extraNote: '',
-    discount: 0,
-    isTaxInclusive: false,
+  const [quotation, setQuotation] = useState<QuotationData>(() => {
+    const savedTheme = localStorage.getItem('app_theme_color') || '#1f2937';
+    return createInitialQuotation(savedTheme);
   });
 
   const [savedFiles, setSavedFiles] = useState<QuotationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [statusIsError, setStatusIsError] = useState(false);
   const [showFileMenu, setShowFileMenu] = useState(false);
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Delete Modal State ---
   const [deleteModal, setDeleteModal] = useState<{
@@ -111,42 +143,71 @@ const App: React.FC = () => {
     problem: { question: '', answer: 0, options: [] }
   });
 
+  // --- Helpers ---
+  const showStatus = useCallback((msg: string, isError = false) => {
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+    setStatusMsg(msg);
+    setStatusIsError(isError);
+    statusTimer.current = setTimeout(() => {
+      setStatusMsg('');
+      setStatusIsError(false);
+    }, 3000);
+  }, []);
+
+  const loadFileList = useCallback(async () => {
+    if (!isFirebaseConfigured || !auth?.currentUser) return;
+
+    try {
+      const files = await fetchQuotationsFromCloud();
+      setSavedFiles(files);
+    } catch (error) {
+      console.error(error);
+      showStatus('無法載入檔案列表', true);
+    }
+  }, [showStatus]);
+
   // --- Effects ---
-  
-  // Listen for Firebase Auth State Changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsLoggedIn(true);
-      } else {
-        setIsLoggedIn(false);
-      }
+    if (!isFirebaseConfigured || !auth) {
       setIsAuthChecking(false);
-    });
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        setIsLoggedIn(Boolean(user));
+        setIsAuthChecking(false);
+      },
+      (error) => {
+        console.error('Auth state check failed', error);
+        setIsLoggedIn(false);
+        setIsAuthChecking(false);
+      },
+    );
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    // Only load files if logged in and configured
-    if (isFirebaseConfigured && isLoggedIn) {
-      loadFileList();
-    }
-  }, [isLoggedIn]);
+    if (isFirebaseConfigured && isLoggedIn) loadFileList();
+  }, [isLoggedIn, loadFileList]);
 
-  // Persist Theme Selection
   useEffect(() => {
     localStorage.setItem('app_theme_color', quotation.themeColor);
   }, [quotation.themeColor]);
 
-  // --- Helpers ---
+  useEffect(() => () => {
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+  }, []);
+
   const handleLoginSuccess = () => {
-    // Ideally handled by onAuthStateChanged, but kept for immediate feedback if needed
-    setIsLoggedIn(true);
     showStatus('登入成功');
   };
 
   const handleLogout = async () => {
+    if (!auth) return;
+
     try {
       await signOut(auth);
       // setIsLoggedIn(false) will be handled by onAuthStateChanged
@@ -155,47 +216,53 @@ const App: React.FC = () => {
     }
   };
 
-  const showStatus = (msg: string, isError = false) => {
-    setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(''), 3000);
-  };
-
-  const loadFileList = async () => {
-    try {
-      const files = await fetchQuotationsFromCloud();
-      setSavedFiles(files);
-    } catch (error) {
-      console.error(error);
-      showStatus('無法載入檔案列表', true);
-    }
-  };
-
   const handleCreateNew = () => {
-    setQuotation({
-      ...quotation, // Keeps current theme
+    setQuotation((prev) => ({
+      ...prev,
+      id: undefined,
       fileName: '', 
-      items: [{ id: Date.now(), name: '', spec: '', description: null, quantity: 1, price: 0 }],
+      quoteDetails: {
+        ...prev.quoteDetails,
+        number: createQuoteNumber(),
+        date: getLocalDate(),
+      },
+      items: [createQuoteItem()],
       clientInfo: { name: '', contact: '', address: '', phone: '' },
       discount: 0,
       extraNote: '',
-    });
+    }));
     setShowFileMenu(false);
     showStatus('已建立新報價單');
   };
 
   const handleSave = async () => {
     if (!isFirebaseConfigured) {
-      alert("請先設定 Firebase Config (詳見 firebaseConfig.ts)");
+      alert("請先設定 Firebase 環境變數（詳見 .env.example）");
       return;
     }
     if (!quotation.fileName.trim()) {
       alert("請輸入檔案名稱");
       return;
     }
+    if (!auth?.currentUser) {
+      showStatus('登入狀態已失效，請重新登入', true);
+      return;
+    }
 
     setIsLoading(true);
     try {
-      await saveQuotationToCloud(quotation);
+      const savedQuotation = await saveQuotationToCloud({
+        ...quotation,
+        fileName: quotation.fileName.trim(),
+      });
+      setQuotation((prev) => ({
+        ...prev,
+        id: savedQuotation.id,
+        fileName: savedQuotation.fileName,
+        logo: savedQuotation.logo,
+        seal: savedQuotation.seal,
+        updatedAt: savedQuotation.updatedAt,
+      }));
       await loadFileList();
       showStatus('儲存成功');
     } catch (error) {
@@ -207,9 +274,10 @@ const App: React.FC = () => {
   };
 
   const handleLoad = (file: QuotationData) => {
+    const savedTheme = localStorage.getItem('app_theme_color');
     setQuotation({
       ...file,
-      themeColor: localStorage.getItem('app_theme_color') || file.themeColor // Force global theme
+      themeColor: savedTheme || file.themeColor,
     });
     setShowFileMenu(false);
     showStatus(`已載入: ${file.fileName}`);
@@ -226,7 +294,7 @@ const App: React.FC = () => {
   };
 
   const confirmDelete = async (selectedAnswer: number) => {
-    if (!deleteModal.file) return;
+    if (!deleteModal.file?.id) return;
 
     if (selectedAnswer !== deleteModal.problem.answer) {
       alert("答錯了！取消刪除。");
@@ -236,11 +304,11 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await deleteQuotationFromCloud(deleteModal.file.fileName);
+      await deleteQuotationFromCloud(deleteModal.file.id);
       await loadFileList();
       
       // If deleted current file, reset to new
-      if (quotation.fileName === deleteModal.file.fileName) {
+      if (quotation.id === deleteModal.file.id) {
         handleCreateNew();
       }
       showStatus('已刪除');
@@ -249,7 +317,7 @@ const App: React.FC = () => {
       showStatus('刪除失敗');
     } finally {
       setIsLoading(false);
-      setDeleteModal({ ...deleteModal, isOpen: false });
+      setDeleteModal((prev) => ({ ...prev, isOpen: false, file: null }));
     }
   };
 
@@ -268,25 +336,32 @@ const App: React.FC = () => {
   };
 
   // --- Item Handlers ---
-  const updateItem = (id: number, field: keyof QuoteItem, value: any) => {
+  function updateItem<K extends keyof QuoteItem>(id: string | number, field: K, value: QuoteItem[K]) {
+    const normalizedValue = field === 'quantity' || field === 'price'
+      ? Math.min(1_000_000_000, Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0))
+      : value;
+
     setQuotation(prev => ({
       ...prev,
-      items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
+      items: prev.items.map(item => item.id === id
+        ? { ...item, [field]: normalizedValue }
+        : item),
     }));
-  };
+  }
 
   const addItem = () => {
     setQuotation(prev => ({
       ...prev,
-      items: [...prev.items, { id: Date.now(), name: '', spec: '', description: null, quantity: 1, price: 0 }]
+      items: [...prev.items, createQuoteItem()]
     }));
   };
 
-  const deleteItem = (id: number) => {
-    if (quotation.items.length <= 1) return;
+  const deleteItem = (id: string | number) => {
     setQuotation(prev => ({
       ...prev,
-      items: prev.items.filter(item => item.id !== id)
+      items: prev.items.length <= 1
+        ? prev.items
+        : prev.items.filter(item => item.id !== id),
     }));
   };
 
@@ -308,8 +383,13 @@ const App: React.FC = () => {
         <>
           {/* --- Status Toast --- */}
           {statusMsg && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 animate-fade-in print:hidden">
-              <Check size={16} className="text-green-400" /> {statusMsg}
+            <div
+              className={`fixed top-24 left-1/2 -translate-x-1/2 z-50 text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 animate-fade-in print:hidden ${statusIsError ? 'bg-red-700' : 'bg-gray-800'}`}
+              role="status"
+              aria-live="polite"
+            >
+              {statusIsError ? <AlertTriangle size={16} /> : <Check size={16} className="text-green-400" />}
+              {statusMsg}
             </div>
           )}
 
@@ -319,7 +399,7 @@ const App: React.FC = () => {
               <div className="container mx-auto flex items-center gap-2">
                 <AlertTriangle />
                 <p className="font-bold">尚未設定 Firebase</p>
-                <p className="text-sm">請編輯 <code>firebaseConfig.ts</code> 填入您的專案金鑰以啟用雲端儲存功能。</p>
+                <p className="text-sm">請複製 <code>.env.example</code> 為 <code>.env.local</code>，填入 Firebase 設定以啟用雲端儲存功能。</p>
               </div>
             </div>
           )}
@@ -336,7 +416,7 @@ const App: React.FC = () => {
                         <input 
                           className="bg-transparent outline-none text-sm font-medium w-32 md:w-64 placeholder-gray-400" 
                           value={quotation.fileName}
-                          onChange={(e) => setQuotation({...quotation, fileName: e.target.value})}
+                           onChange={(e) => setQuotation((previous) => ({ ...previous, fileName: e.target.value }))}
                           onFocus={() => setShowFileMenu(true)}
                           placeholder="檔案名稱"
                         />
@@ -395,8 +475,9 @@ const App: React.FC = () => {
                  </div>
 
                  <button 
-                    onClick={loadFileList} 
-                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition" 
+                   onClick={loadFileList} 
+                     disabled={isLoading}
+                     className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition" 
                     title="重新整理列表"
                  >
                    <RefreshCw size={18} />
@@ -410,7 +491,7 @@ const App: React.FC = () => {
                       <input 
                           type="checkbox" 
                           checked={quotation.isTaxInclusive} 
-                          onChange={(e) => setQuotation({...quotation, isTaxInclusive: e.target.checked})} 
+                           onChange={(e) => setQuotation((previous) => ({ ...previous, isTaxInclusive: e.target.checked }))} 
                           className="accent-gray-900 rounded w-4 h-4" 
                       />
                       單價已含稅
@@ -421,7 +502,7 @@ const App: React.FC = () => {
                      <input 
                         type="color" 
                         value={quotation.themeColor} 
-                        onChange={(e) => setQuotation({...quotation, themeColor: e.target.value})}
+                         onChange={(e) => setQuotation((previous) => ({ ...previous, themeColor: e.target.value }))}
                         className="w-6 h-6 rounded cursor-pointer border-0 p-0"
                      />
                   </div>
@@ -493,8 +574,9 @@ const App: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {deleteModal.problem.options.map((option, idx) => (
-                        <button
-                          key={idx}
+                          <button
+                            disabled={isLoading}
+                            key={idx}
                           onClick={() => confirmDelete(option)}
                           className="py-2 px-1 bg-white border border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-gray-700 rounded shadow-sm font-medium transition"
                         >

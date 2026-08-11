@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 雲端報價單系統
 
-# Run and deploy your AI Studio app
+React、Vite、Firebase Authentication、Cloud Firestore 與 Firebase Storage 的報價單系統。
 
-This contains everything you need to run your app locally.
+## 本機啟動
 
-View your app in AI Studio: https://ai.studio/apps/637dc705-6c3b-4bee-a624-0586e2e6f6ef
+需求：Node.js 18 或更新版本。
 
-## Run Locally
+```bash
+npm install
+copy .env.example .env.local
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+請在 `.env.local` 填入 Firebase Web App 設定。Firebase Console 需要啟用：
 
+- Authentication 的 Email/Password 登入
+- Cloud Firestore
+- Firebase Storage
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+`.env.local` 不應上傳 GitHub；`.env.example` 可以提交。
+
+## 建置與檢查
+
+```bash
+npm run typecheck
+npm run build
+npm run preview
+```
+
+## Firebase Rules
+
+規則檔案為 `firestore.rules` 與 `storage.rules`。使用 Firebase CLI 部署前，請確認 `.firebaserc` 的 project ID 正確：
+
+```bash
+firebase deploy --only firestore:rules,storage
+```
+
+報價資料會依登入使用者儲存在 `users/{uid}/quotations/{quotationId}`，圖片會儲存在 Firebase Storage 的相同使用者路徑下。
+
+## 舊資料注意事項
+
+舊版本使用頂層 `quotations` collection，且以檔名作為文件 ID。新版不會自動讀取舊資料；正式套用 Rules 前，請先備份並完成一次資料遷移。
+
+## GitHub 上傳
+
+請上傳 `github-upload` 資料夾裡的內容，不要上傳 `.env.local`、`node_modules` 或 `migrated_prompt_history`。

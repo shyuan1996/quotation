@@ -4,26 +4,47 @@ import { Image, Stamp, Plus, Trash2, Tag } from './Icons';
 
 interface Props {
   data: QuotationData;
-  setData: (data: QuotationData) => void;
-  updateItem: (id: number, field: keyof QuoteItem, value: any) => void;
+  setData: React.Dispatch<React.SetStateAction<QuotationData>>;
+  updateItem: <K extends keyof QuoteItem>(id: string | number, field: K, value: QuoteItem[K]) => void;
   addItem: () => void;
-  deleteItem: (id: number) => void;
+  deleteItem: (id: string | number) => void;
 }
 
 // Helper: Format Currency
 const formatCurrency = (num: number) => {
-  if (isNaN(num)) return "NT$0";
+  if (!Number.isFinite(num)) return "NT$0";
   return "NT$" + new Intl.NumberFormat('en-US', { 
       minimumFractionDigits: 0, 
       maximumFractionDigits: 0 
   }).format(num);
 };
 
+const parseBoundedNumber = (value: string, max = 1_000_000_000) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(max, Math.max(0, parsed));
+};
+
 // Helper: Process and compress image
-const processImage = (file: File, callback: (result: string) => void) => {
+const processImage = (
+  file: File,
+  callback: (result: string) => void,
+  onError: (message: string) => void,
+) => {
+  if (!file.type.startsWith('image/')) {
+    onError('請選擇圖片檔案');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    onError('圖片大小不可超過 5 MB');
+    return;
+  }
+
   const reader = new FileReader();
+  reader.onerror = () => onError('圖片讀取失敗');
   reader.onload = (e) => {
     const img = new window.Image();
+    img.onerror = () => onError('圖片格式無法讀取');
     img.onload = () => {
       const canvas = document.createElement('canvas');
       let width = img.width;
@@ -47,7 +68,9 @@ const processImage = (file: File, callback: (result: string) => void) => {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, width, height);
-        callback(canvas.toDataURL('image/png', 0.8));
+        callback(canvas.toDataURL('image/png'));
+      } else {
+        onError('圖片處理失敗');
       }
     };
     img.src = e.target?.result as string;
@@ -96,9 +119,13 @@ const EditablePriceCell: React.FC<{ value: number; displayValue?: number; onChan
             <input 
                 ref={inputRef}
                 type="number"
+                min="0"
+                max="1000000000"
+                step="any"
+                aria-label="單價"
                 className="text-right w-full bg-white outline-none border-b border-blue-500 m-0 px-1 py-0 h-[32px] leading-[32px] text-black font-medium text-[17px] block box-border" 
                 value={value === 0 ? '' : value} 
-                onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                onChange={(e) => onChange(parseBoundedNumber(e.target.value))}
                 onBlur={() => setIsEditing(false)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') setIsEditing(false);
@@ -142,15 +169,17 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
         return;
     }
 
-    const _items = [...data.items];
-    const draggedItemContent = _items[dragItem.current];
+    const fromIndex = dragItem.current;
+    const targetIndex = dragOverItem.current;
 
-    // Remove the item from its original position
-    _items.splice(dragItem.current, 1);
-    // Insert it at the new position
-    _items.splice(dragOverItem.current, 0, draggedItemContent);
-
-    setData({ ...data, items: _items });
+    setData((previous) => {
+      const items = [...previous.items];
+      const [draggedItem] = items.splice(fromIndex, 1);
+      if (!draggedItem) return previous;
+      const insertIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      items.splice(Math.max(0, insertIndex), 0, draggedItem);
+      return { ...previous, items };
+    });
     
     dragItem.current = null;
     dragOverItem.current = null;
@@ -162,7 +191,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
       const A4_CONTENT_HEIGHT = 1100; 
       
       const HEADER_HEIGHT = 200; 
-      const FOOTER_HEIGHT = 200; 
+      const FOOTER_HEIGHT = 230 + (data.discount > 0 ? 35 : 0);
       const PAGE_2_HEADER_HEIGHT = 40; 
       const ROW_BASE_HEIGHT = 45; 
       const ROW_LINE_HEIGHT = 25; 
@@ -190,42 +219,28 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
       const resultPages: QuoteItem[][] = [];
       let currentPageItems: QuoteItem[] = [];
-      let currentHeight = HEADER_HEIGHT; 
-      let pageIndex = 0;
+      let currentHeight = HEADER_HEIGHT;
 
       data.items.forEach((item, index) => {
           const itemHeight = getItemHeight(item);
-          let limit = A4_CONTENT_HEIGHT - BOTTOM_SPACER; 
-          
-          const isLastItemGlobal = index === data.items.length - 1;
-          
-          if (isLastItemGlobal) {
-             if (currentHeight + itemHeight + FOOTER_HEIGHT > A4_CONTENT_HEIGHT) {
-                 if (currentHeight + itemHeight < limit) {
-                     currentPageItems.push(item);
-                     resultPages.push(currentPageItems);
-                     currentPageItems = []; 
-                     currentHeight = PAGE_2_HEADER_HEIGHT;
-                 } else {
-                     resultPages.push(currentPageItems);
-                     currentPageItems = [item];
-                     currentHeight = PAGE_2_HEADER_HEIGHT + itemHeight;
-                 }
-             } else {
-                 currentPageItems.push(item);
-                 currentHeight += itemHeight;
-             }
-          } else {
-              if (currentHeight + itemHeight > limit) {
-                  resultPages.push(currentPageItems);
-                  currentPageItems = [item];
-                  currentHeight = PAGE_2_HEADER_HEIGHT + itemHeight; 
-                  pageIndex++;
-              } else {
-                  currentPageItems.push(item);
-                  currentHeight += itemHeight;
-              }
+          const isLastItem = index === data.items.length - 1;
+          const availableHeight = A4_CONTENT_HEIGHT
+            - BOTTOM_SPACER
+            - (isLastItem ? FOOTER_HEIGHT : 0);
+
+          // When the final page needs the footer, move the row to a new page
+          // instead of leaving a row that pushes the footer off the paper.
+          if (
+            currentPageItems.length > 0
+            && currentHeight + itemHeight > availableHeight
+          ) {
+            resultPages.push(currentPageItems);
+            currentPageItems = [];
+            currentHeight = PAGE_2_HEADER_HEIGHT;
           }
+
+          currentPageItems.push(item);
+          currentHeight += itemHeight;
       });
 
       if (currentPageItems.length > 0) {
@@ -236,10 +251,21 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
 
       return resultPages;
 
-  }, [data.items, data.discount, data.quoteDetails, data.companyInfo, data.clientInfo]);
+  }, [
+    data.items,
+    data.discount,
+    data.extraNote,
+    data.notes,
+    data.logo,
+    data.seal,
+    data.companyInfo,
+    data.clientInfo,
+    data.quoteDetails,
+  ]);
 
   // --- Calculations ---
-  const taxFactor = 1 + (data.quoteDetails.taxRate / 100);
+  const taxRate = Math.min(100, Math.max(0, Number(data.quoteDetails.taxRate) || 0));
+  const taxFactor = 1 + (taxRate / 100);
   
   // Logic: 
   // If Tax Inclusive: Unit Price (Input) -> Convert to Pre-Tax Unit Price -> Multiply by Qty -> Row Amount
@@ -251,28 +277,37 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
       return price;
   };
 
-  let calculatedSubtotal = 0;
-  data.items.forEach(item => {
-      const unitPrice = getPreTaxUnitPrice(item.price);
-      calculatedSubtotal += unitPrice * item.quantity;
-  });
+  const calculatedSubtotal = data.items.reduce((subtotal, item) => {
+      const unitPrice = Math.max(0, Number(item.price) || 0);
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      return subtotal + getPreTaxUnitPrice(unitPrice) * quantity;
+  }, 0);
 
-  const taxableAmount = Math.max(0, calculatedSubtotal - (data.discount || 0));
-  const taxAmount = Math.round(taxableAmount * (data.quoteDetails.taxRate / 100));
+  const discount = Math.min(1_000_000_000, Math.max(0, Number(data.discount) || 0));
+  const taxableAmount = Math.max(0, calculatedSubtotal - discount);
+  const taxAmount = Math.round(taxableAmount * (taxRate / 100));
   const total = taxableAmount + taxAmount;
 
   // --- Handlers ---
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-          processImage(file, (result) => setData({ ...data, logo: result }));
+          processImage(
+            file,
+            (result) => setData((previous) => ({ ...previous, logo: result })),
+            (message) => alert(message),
+          );
       }
   };
 
   const handleSealUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-          processImage(file, (result) => setData({ ...data, seal: result }));
+          processImage(
+            file,
+            (result) => setData((previous) => ({ ...previous, seal: result })),
+            (message) => alert(message),
+          );
       }
   };
 
@@ -363,32 +398,32 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             <input 
                                             className={`text-[28px] font-bold placeholder-gray-300 ${inputStyle} mb-0 py-0 leading-none h-8 -ml-1`} 
                                             value={data.companyInfo.name}
-                                            onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, name: e.target.value}})}
+                                            onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, name: e.target.value } }))}
                                             placeholder="公司名稱"
                                             />
                                             {/* Adjusted spacing to gap-0 */}
                                             <div className="text-[15px] text-gray-700 flex flex-col gap-0 leading-[1.1]">
                                                 <div className="flex items-center gap-1 h-6">
                                                     <span className="w-12 font-medium shrink-0 pl-1">地址:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.address} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, address: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.address} onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, address: e.target.value } }))} />
                                                 </div>
                                                 <div className="flex items-center gap-4 h-6">
                                                     <div className="flex items-center gap-1 flex-1 h-full">
                                                         <span className="w-12 font-medium shrink-0 pl-1">電話:</span>
-                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.phone} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, phone: e.target.value}})} />
+                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.phone} onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, phone: e.target.value } }))} />
                                                     </div>
                                                     <div className="flex items-center gap-1 flex-1 h-full">
                                                         <span className="w-12 font-medium shrink-0 pl-1">傳真:</span>
-                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.fax} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, fax: e.target.value}})} />
+                                                        <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.fax} onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, fax: e.target.value } }))} />
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1 h-6">
                                                     <span className="w-12 font-medium shrink-0 pl-1">信箱:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.email} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, email: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.email} onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, email: e.target.value } }))} />
                                                 </div>
                                                 <div className="flex items-center gap-1 h-6">
                                                     <span className="w-12 font-medium shrink-0 pl-1">統編:</span>
-                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.taxId} onChange={(e) => setData({...data, companyInfo: {...data.companyInfo, taxId: e.target.value}})} />
+                                                    <input className={`flex-1 ${inputStyle} py-0 leading-none h-full`} value={data.companyInfo.taxId} onChange={(e) => setData((previous) => ({ ...previous, companyInfo: { ...previous.companyInfo, taxId: e.target.value } }))} />
                                                 </div>
                                             </div>
                                         </div>
@@ -402,7 +437,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             <input 
                                                 className={`font-mono text-base w-[150px] py-0 h-6 leading-none ${underlinedInputStyle} keep-border mb-[2px]`} 
                                                 value={data.quoteDetails.number} 
-                                                onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, number: e.target.value}})} 
+                                                onChange={(e) => setData((previous) => ({ ...previous, quoteDetails: { ...previous.quoteDetails, number: e.target.value } }))} 
                                             />
                                             
                                             <span className="font-bold text-gray-800 text-[17px] text-right leading-none pb-[2px] whitespace-nowrap">日期:</span>
@@ -411,7 +446,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                     type="date" 
                                                     className={`font-mono text-base relative z-10 cursor-pointer py-0 h-6 leading-none w-full ${underlinedInputStyle} keep-border`} 
                                                     value={data.quoteDetails.date} 
-                                                    onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, date: e.target.value}})} 
+                                                    onChange={(e) => setData((previous) => ({ ...previous, quoteDetails: { ...previous.quoteDetails, date: e.target.value } }))} 
                                                 />
                                             </div>
                                         </div>
@@ -425,21 +460,21 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             className={`w-full font-bold text-[19px] ${inputStyle} py-0 leading-tight h-[28px] overflow-hidden min-h-0 bg-transparent block`} 
                                             rows={1}
                                             value={data.clientInfo.name} 
-                                            onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, name: e.target.value}})}
+                                            onChange={(e) => setData((previous) => ({ ...previous, clientInfo: { ...previous.clientInfo, name: e.target.value } }))}
                                             placeholder="輸入客戶名稱"
                                         />
                                     </div>
                                     <div>
                                         <label className="text-xs text-gray-500 block mb-0 leading-none">電話</label>
                                         <input className={`text-[17px] w-full ${inputStyle} py-0 leading-tight h-[28px]`} 
-                                            value={data.clientInfo.phone} onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, phone: e.target.value}})} placeholder="電話" />
+                                            value={data.clientInfo.phone} onChange={(e) => setData((previous) => ({ ...previous, clientInfo: { ...previous.clientInfo, phone: e.target.value } }))} placeholder="電話" />
                                     </div>
                                     <div>
                                         <label className="text-xs text-gray-500 block mb-0 leading-none">地址</label>
                                         <AutoHeightTextarea 
                                             className={`text-[17px] w-full ${inputStyle} py-0 leading-tight h-[28px] overflow-hidden min-h-0 block`} 
                                             value={data.clientInfo.address} 
-                                            onChange={(e) => setData({...data, clientInfo: {...data.clientInfo, address: e.target.value}})} 
+                                            onChange={(e) => setData((previous) => ({ ...previous, clientInfo: { ...previous.clientInfo, address: e.target.value } }))} 
                                             placeholder="地址" 
                                             rows={1}
                                         />
@@ -535,7 +570,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                                 </div>
                                             </td>
                                             <td className="px-1 py-0 text-center align-top">
-                                                <input type="number" className={`text-center ${inputStyle} text-[17px] py-0 h-[32px] leading-[32px] block box-border m-0 border border-transparent`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                                                <input type="number" min="0" max="1000000000" step="any" aria-label="數量" className={`text-center ${inputStyle} text-[17px] py-0 h-[32px] leading-[32px] block box-border m-0 border border-transparent`} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseBoundedNumber(e.target.value))} />
                                             </td>
                                             <td className="px-1 py-0 align-top">
                                                 <EditablePriceCell 
@@ -581,7 +616,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         className={`h-full w-full resize-none ${inputStyle} text-base p-2 overflow-hidden block box-border`} 
                                         placeholder="額外備註 (Optional)..."
                                         value={data.extraNote}
-                                        onChange={(e) => setData({...data, extraNote: e.target.value})}
+                                        onChange={(e) => setData((previous) => ({ ...previous, extraNote: e.target.value }))}
                                     ></textarea>
                                 </div>
                                 
@@ -621,7 +656,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     <div className="flex justify-between py-1 text-[17px] text-red-600 items-center font-bold whitespace-nowrap">
                                         <div className="flex items-center gap-1">
                                             <span>折扣 (Discount)</span>
-                                            <button onClick={() => {setShowDiscount(false); setData({...data, discount: 0});}} className="text-gray-400 hover:text-red-500 print:hidden ml-1">
+                                            <button onClick={() => {setShowDiscount(false); setData((previous) => ({ ...previous, discount: 0 }));}} className="text-gray-400 hover:text-red-500 print:hidden ml-1" aria-label="移除折扣">
                                             &times;
                                             </button>
                                         </div>
@@ -631,8 +666,11 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                             <input 
                                                 type="number" 
                                                 className={`w-24 text-right text-red-600 bg-white outline-none`} 
+                                                min="0"
+                                                max="1000000000"
+                                                step="any"
                                                 value={data.discount} 
-                                                onChange={(e) => setData({...data, discount: parseFloat(e.target.value) || 0})}
+                                                onChange={(e) => setData((previous) => ({ ...previous, discount: parseBoundedNumber(e.target.value) }))}
                                             />
                                         </div>
                                     </div>
@@ -642,7 +680,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         <span className="text-gray-600 flex items-center gap-1">
                                             營業稅 (Tax)
                                             <span className="bg-gray-200 px-1 rounded text-xs print:hidden flex items-center">
-                                                <input type="number" className="w-8 text-center bg-transparent outline-none" value={data.quoteDetails.taxRate} onChange={(e) => setData({...data, quoteDetails: {...data.quoteDetails, taxRate: parseFloat(e.target.value) || 0}})} />%
+                                                <input type="number" min="0" max="100" step="0.01" aria-label="稅率" className="w-8 text-center bg-transparent outline-none" value={data.quoteDetails.taxRate} onChange={(e) => setData((previous) => ({ ...previous, quoteDetails: { ...previous.quoteDetails, taxRate: parseBoundedNumber(e.target.value, 100) } }))} />%
                                             </span>
                                             <span className="hidden print:inline text-xs">({data.quoteDetails.taxRate}%)</span>
                                         </span>
@@ -664,7 +702,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                         rows={6}
                                         className={`w-full text-base text-gray-600 leading-relaxed ${inputStyle}`} 
                                         value={data.notes}
-                                        onChange={(e) => setData({...data, notes: e.target.value})}
+                                         onChange={(e) => setData((previous) => ({ ...previous, notes: e.target.value }))}
                                     />
                                 </div>
                                 {/* Footer Right Column: Changed gap-6 to gap-0 */}
@@ -675,7 +713,7 @@ export const QuotationPreview: React.FC<Props> = ({ data, setData, updateItem, a
                                     </div>
                                     <div className="mt-0">
                                         <div className="mb-1 font-bold text-xl tracking-wide text-center">
-                                            <input className={`text-center ${inputStyle}`} value={data.salesPerson} onChange={(e) => setData({...data, salesPerson: e.target.value})} />
+                                             <input className={`text-center ${inputStyle}`} value={data.salesPerson} onChange={(e) => setData((previous) => ({ ...previous, salesPerson: e.target.value }))} />
                                         </div>
                                         <div className="border-t border-black pt-2 text-center text-base">業務人員</div>
                                     </div>
