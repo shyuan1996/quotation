@@ -10,13 +10,7 @@ import {
   setDoc,
   Timestamp,
 } from 'firebase/firestore';
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadString,
-} from 'firebase/storage';
-import { auth, db, isFirebaseConfigured, storage } from '../firebaseConfig';
+import { auth, db, isFirebaseConfigured } from '../firebaseConfig';
 import {
   createQuoteItemId,
   DEFAULT_COMPANY_INFO,
@@ -148,49 +142,22 @@ const getUserCollection = () => {
   };
 };
 
-const uploadQuotationImage = async (
-  value: string | null,
-  userId: string,
-  quotationId: string,
-  imageName: 'logo' | 'seal',
-): Promise<string | null> => {
-  if (!value) return null;
-  if (!value.startsWith('data:')) return value;
-  if (!storage) throw new Error('Firebase Storage 尚未設定');
-
-  const imageRef = ref(
-    storage,
-    `users/${userId}/quotations/${quotationId}/${imageName}.png`,
-  );
-  await uploadString(imageRef, value, 'data_url');
-  return getDownloadURL(imageRef);
-};
-
 export const saveQuotationToCloud = async (
   data: QuotationData,
 ): Promise<QuotationData> => {
   const { user, collectionRef } = getUserCollection();
   const quotationId = data.id?.trim() || doc(collectionRef).id;
   const docRef = doc(collectionRef, quotationId);
-  const { id: _id, updatedAt: _updatedAt, logo, seal, ...quotationPayload } = data;
-
-  const [logoUrl, sealUrl] = await Promise.all([
-    uploadQuotationImage(logo, user.uid, quotationId, 'logo'),
-    uploadQuotationImage(seal, user.uid, quotationId, 'seal'),
-  ]);
+  const { id: _id, updatedAt: _updatedAt, ...quotationPayload } = data;
 
   await setDoc(docRef, {
     ...quotationPayload,
-    logo: logoUrl,
-    seal: sealUrl,
     updatedAt: serverTimestamp(),
   });
 
   return {
     ...data,
     id: docRef.id,
-    logo: logoUrl,
-    seal: sealUrl,
     updatedAt: Date.now(),
   };
 };
@@ -210,16 +177,9 @@ export const fetchQuotationsFromCloud = async (): Promise<QuotationData[]> => {
 };
 
 export const deleteQuotationFromCloud = async (quotationId: string): Promise<void> => {
-  const { user, collectionRef } = getUserCollection();
+  const { collectionRef } = getUserCollection();
   const cleanId = quotationId.trim();
   if (!cleanId || cleanId.includes('/')) throw new Error('無效的報價單 ID');
 
   await deleteDoc(doc(collectionRef, cleanId));
-
-  if (storage) {
-    await Promise.allSettled([
-      deleteObject(ref(storage, `users/${user.uid}/quotations/${cleanId}/logo.png`)),
-      deleteObject(ref(storage, `users/${user.uid}/quotations/${cleanId}/seal.png`)),
-    ]);
-  }
 };
