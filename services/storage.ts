@@ -3,9 +3,6 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  limit,
-  orderBy,
-  query,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -164,16 +161,16 @@ export const saveQuotationToCloud = async (
 
 export const fetchQuotationsFromCloud = async (): Promise<QuotationData[]> => {
   const { collectionRef } = getUserCollection();
-  const q = query(
-    collectionRef,
-    orderBy('updatedAt', 'desc'),
-    limit(MAX_LIST_SIZE),
-  );
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocs(collectionRef);
 
-  return querySnapshot.docs.map((snapshot) => (
-    normalizeQuotation(snapshot.data(), snapshot.id)
-  ));
+  return querySnapshot.docs
+    .map((snapshot) => normalizeQuotation(snapshot.data(), snapshot.id))
+    .sort((first, second) => {
+      const timestampDifference = (second.updatedAt ?? 0) - (first.updatedAt ?? 0);
+      if (timestampDifference !== 0) return timestampDifference;
+      return first.fileName.localeCompare(second.fileName, 'zh-Hant');
+    })
+    .slice(0, MAX_LIST_SIZE);
 };
 
 export const deleteQuotationFromCloud = async (quotationId: string): Promise<void> => {
