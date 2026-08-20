@@ -131,6 +131,7 @@ const App: React.FC = () => {
   const [statusIsError, setStatusIsError] = useState(false);
   const [showFileMenu, setShowFileMenu] = useState(false);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistedFileNameRef = useRef<string | null>(null);
 
   // --- Delete Modal State ---
   const [deleteModal, setDeleteModal] = useState<{
@@ -217,6 +218,7 @@ const App: React.FC = () => {
   };
 
   const handleCreateNew = () => {
+    persistedFileNameRef.current = null;
     setQuotation((prev) => ({
       ...prev,
       id: undefined,
@@ -251,10 +253,18 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     try {
+      const cleanFileName = quotation.fileName.trim();
+      const shouldSaveAsNew = Boolean(
+        quotation.id
+        && persistedFileNameRef.current
+        && persistedFileNameRef.current.trim() !== cleanFileName
+      );
       const savedQuotation = await saveQuotationToCloud({
         ...quotation,
-        fileName: quotation.fileName.trim(),
+        id: shouldSaveAsNew ? undefined : quotation.id,
+        fileName: cleanFileName,
       });
+      persistedFileNameRef.current = savedQuotation.fileName;
       setQuotation((prev) => ({
         ...prev,
         id: savedQuotation.id,
@@ -264,7 +274,7 @@ const App: React.FC = () => {
         updatedAt: savedQuotation.updatedAt,
       }));
       await loadFileList();
-      showStatus('儲存成功');
+      showStatus(shouldSaveAsNew ? '已另存新檔，原報價已保留' : '儲存成功');
     } catch (error) {
       console.error(error);
       showStatus('儲存失敗: 請檢查控制台');
@@ -275,6 +285,7 @@ const App: React.FC = () => {
 
   const handleLoad = (file: QuotationData) => {
     const savedTheme = localStorage.getItem('app_theme_color');
+    persistedFileNameRef.current = file.fileName;
     setQuotation({
       ...file,
       themeColor: savedTheme || file.themeColor,
@@ -439,16 +450,10 @@ const App: React.FC = () => {
                           </div>
                           <div className="bg-gray-50 px-4 py-1 text-[10px] text-gray-400 font-bold uppercase tracking-wider">雲端存檔</div>
                           <div className="max-h-64 overflow-y-auto">
-                            {(() => {
-                              const filteredFiles = savedFiles.filter(file => 
-                                file.fileName.toLowerCase().includes(quotation.fileName.toLowerCase())
-                              );
-                              
-                              if (filteredFiles.length === 0) {
-                                return <div className="px-4 py-3 text-sm text-gray-400 text-center">無符合存檔</div>;
-                              }
-                              
-                              return filteredFiles.map(file => (
+                            {savedFiles.length === 0 ? (
+                              <div className="px-4 py-3 text-sm text-gray-400 text-center">無存檔</div>
+                            ) : (
+                              savedFiles.map(file => (
                                 <div 
                                   key={file.id || file.fileName}
                                   className="px-4 py-2 hover:bg-gray-50 text-sm text-gray-700 border-b border-gray-50 last:border-0 flex justify-between items-center group"
@@ -456,7 +461,7 @@ const App: React.FC = () => {
                                   <div className="flex-grow cursor-pointer truncate mr-2" onClick={() => handleLoad(file)}>
                                     {file.fileName}
                                     <span className="block text-[10px] text-gray-400">
-                                      {file.updatedAt ? new Date(file.updatedAt).toLocaleDateString() : ''}
+                                      {file.quoteDetails.date || (file.updatedAt ? new Date(file.updatedAt).toLocaleDateString() : '')}
                                     </span>
                                   </div>
                                   <button 
@@ -467,8 +472,8 @@ const App: React.FC = () => {
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
-                              ));
-                            })()}
+                              ))
+                            )}
                           </div>
                       </div>
                     )}
